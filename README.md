@@ -6,11 +6,11 @@ septiembre al 25 de noviembre de 2026.
 
 ## Requisitos
 
-| Herramienta | Versión |
-| --- | --- |
-| Node.js | 24 (ver `.nvmrc`) |
-| pnpm | 11.18.0 (vía Corepack) |
-| Docker | para el Postgres local |
+| Herramienta | Versión                |
+| ----------- | ---------------------- |
+| Node.js     | 24 (ver `.nvmrc`)      |
+| pnpm        | 11.18.0 (vía Corepack) |
+| Docker      | para el Postgres local |
 
 ```bash
 corepack enable
@@ -40,22 +40,22 @@ El flujo de trabajo, el formato de rama y la definición de terminado están en
 
 ## Documentos
 
-| Documento | Archivo |
-| --- | --- |
-| Arquitectura (arc42) | [`docs/01_Arquitectura_SIGBA.pdf`](docs/01_Arquitectura_SIGBA.pdf) |
-| Alcance M1 · Inventario | [`docs/02_Alcance_M1_Inventario.pdf`](docs/02_Alcance_M1_Inventario.pdf) |
+| Documento                  | Archivo                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------ |
+| Arquitectura (arc42)       | [`docs/01_Arquitectura_SIGBA.pdf`](docs/01_Arquitectura_SIGBA.pdf)             |
+| Alcance M1 · Inventario    | [`docs/02_Alcance_M1_Inventario.pdf`](docs/02_Alcance_M1_Inventario.pdf)       |
 | Alcance M2 · Beneficiarios | [`docs/02_Alcance_M2_Beneficiarios.pdf`](docs/02_Alcance_M2_Beneficiarios.pdf) |
-| Alcance M3 · Plataforma | [`docs/02_Alcance_M3_Plataforma.pdf`](docs/02_Alcance_M3_Plataforma.pdf) |
-| Cronograma | [`docs/03_Cronograma_SIGBA.pdf`](docs/03_Cronograma_SIGBA.pdf) |
-| Presupuesto | [`docs/04_Presupuesto_SIGBA.pdf`](docs/04_Presupuesto_SIGBA.pdf) |
-| Registros de decisión | [`docs/adr/`](docs/adr/) |
+| Alcance M3 · Plataforma    | [`docs/02_Alcance_M3_Plataforma.pdf`](docs/02_Alcance_M3_Plataforma.pdf)       |
+| Cronograma                 | [`docs/03_Cronograma_SIGBA.pdf`](docs/03_Cronograma_SIGBA.pdf)                 |
+| Presupuesto                | [`docs/04_Presupuesto_SIGBA.pdf`](docs/04_Presupuesto_SIGBA.pdf)               |
+| Registros de decisión      | [`docs/adr/`](docs/adr/)                                                       |
 
 ## Equipos
 
-| Equipo | Módulo |
-| --- | --- |
-| Equipo 1 | `beneficiarios` |
-| Equipo 2 | `inventario` |
+| Equipo   | Módulo                     |
+| -------- | -------------------------- |
+| Equipo 1 | `beneficiarios`            |
+| Equipo 2 | `inventario`               |
 | Equipo 3 | `plataforma` y `analitica` |
 
 Capitanes: @MiloAgudelo (equipo 3), @MarianaColorado01 y @poethy.

@@ -3,16 +3,18 @@
  * Fuente: Documento de Arquitectura v1.2, sección 5.2 «Reglas de frontera»,
  * ADR-01 y RNF-03 del alcance M3.
  *
- * Lo que se verifica aquí:
+ * Lo que se verifica:
  *
- *  1. Un módulo importa de otro solo lo que este exporta desde `index.ts`,
- *     y lo hace por el alias `@modules/<nombre>`. Las rutas relativas hacia
- *     otro módulo quedan prohibidas porque saltan la API pública.
+ *  1. Un módulo importa de otro solo lo que este exporta desde su `index.ts`.
+ *     `../inventario/index.js` pasa; `../inventario/services/loquesea.js` no.
  *  2. `core` no importa módulos funcionales. Es infraestructura compartida,
  *     no un cuarto módulo de alcance.
- *  3. Ningún módulo depende de `analitica`: solo expone endpoints HTTP.
+ *  3. Nadie importa `analitica`: solo expone endpoints HTTP.
  *  4. La lógica de dominio (`services/`, `events/`) no importa SDK de
  *     proveedores. Los adaptadores implementan los puertos de `core` (RNF-03).
+ *
+ * Las fronteras se comprueban sobre rutas relativas porque `apps/api` es ESM
+ * y los imports llevan la ruta explícita. No hay alias que mantener en paralelo.
  */
 
 /** Módulos funcionales del backend. Sección 5.2. */
@@ -23,7 +25,7 @@ export const MODULO_SIN_CONSUMIDORES = 'analitica';
 
 /**
  * SDK de proveedores que la lógica de dominio no puede importar.
- * Si añades un adaptador nuevo, añade aquí su SDK.
+ * Cuando añadas un adaptador, añade aquí su SDK.
  */
 export const SDK_DE_PROVEEDORES = [
   '@prisma/client',
@@ -41,52 +43,46 @@ export const SDK_DE_PROVEEDORES = [
   '@google-cloud/*',
 ];
 
-const MSG_INDEX = (otro) =>
-  `Un módulo solo importa de otro a través de su index.ts. Usa "@modules/${otro}", ` +
-  `que resuelve a modules/${otro}/index.ts. Si lo que necesitas no está exportado ahí, ` +
-  `no es API pública: pídeselo al equipo dueño (Arquitectura 5.2).`;
+/** Cualquier ruta que entre a una subcarpeta del módulo: dos o más segmentos tras su nombre. */
+const haciaDentroDe = (nombre) => [`../**/${nombre}/*/*`, `../**/${nombre}/*/*/**`];
 
-const MSG_CORE_RELATIVO =
-  'Importa core por su alias "@core/...", no por ruta relativa (Arquitectura 5.2).';
+/** El módulo entero, incluido su index. */
+const haciaTodoDe = (nombre) => [`../**/${nombre}`, `../**/${nombre}/**`];
+
+const MSG_INDEX = (otro) =>
+  `Un módulo solo importa de otro a través de su index.ts. Importa "../${otro}/index.js" ` +
+  `(o "../../${otro}/index.js"). Si lo que necesitas no está exportado ahí, no es API ` +
+  `pública: pídeselo al equipo dueño de ${otro} (Arquitectura 5.2).`;
 
 const MSG_CORE_NO_IMPORTA_MODULOS =
-  'core no importa módulos funcionales. core es infraestructura compartida, ' +
-  'no un cuarto módulo de alcance (Arquitectura 5.2, ADR-01).';
+  'core no importa módulos funcionales. Es infraestructura compartida, no un cuarto ' +
+  'módulo de alcance: los módulos dependen de core, nunca al revés (Arquitectura 5.2, ADR-01).';
 
 const MSG_ANALITICA =
-  'Ningún módulo depende de analitica: solo expone endpoints HTTP. ' +
-  'Si necesitas un dato suyo, el dueño publica un evento (Arquitectura 5.2).';
+  'Ningún módulo depende de analitica: solo expone endpoints HTTP y consume eventos. ' +
+  'Si necesitas un dato suyo, algo está al revés (Arquitectura 5.2).';
 
 const MSG_SDK =
-  'El dominio no importa SDK de proveedores. Define un puerto en core y ponlo ' +
-  'en repositories/ o en un adaptador de infraestructura (RNF-03).';
-
-/** Bloquea el acceso relativo a un directorio hermano, a cualquier profundidad. */
-const relativoHacia = (nombre) => [`../**/${nombre}`, `../**/${nombre}/**`];
+  'La lógica de dominio no importa SDK de proveedores. Define el puerto en core y pon la ' +
+  'dependencia en repositories/ o en un adaptador de infraestructura (RNF-03).';
 
 function patronesDeModulo(modulo) {
   const patrones = [];
 
   for (const otro of MODULOS) {
     if (otro === modulo) continue;
-    patrones.push({ group: relativoHacia(otro), message: MSG_INDEX(otro) });
-  }
-
-  patrones.push({ group: relativoHacia('core'), message: MSG_CORE_RELATIVO });
-  patrones.push({
-    group: ['@modules/*/*', '@modules/*/**'],
-    message: 'El alias @modules apunta al index.ts del módulo. No lo uses para entrar a sus carpetas.',
-  });
-
-  if (modulo !== MODULO_SIN_CONSUMIDORES) {
-    patrones.push({ group: [`@modules/${MODULO_SIN_CONSUMIDORES}`], message: MSG_ANALITICA });
+    if (otro === MODULO_SIN_CONSUMIDORES) {
+      patrones.push({ group: haciaTodoDe(otro), message: MSG_ANALITICA });
+    } else {
+      patrones.push({ group: haciaDentroDe(otro), message: MSG_INDEX(otro) });
+    }
   }
 
   return patrones;
 }
 
 /**
- * @param {{ raiz?: string }} opciones  raíz del código de la API dentro del repo
+ * @param {{ raiz?: string }} opciones  raíz del código de la API
  * @returns {import('eslint').Linter.Config[]}
  */
 export function fronteras({ raiz = 'src' } = {}) {
@@ -101,9 +97,8 @@ export function fronteras({ raiz = 'src' } = {}) {
       rules: { 'no-restricted-imports': ['error', { patterns: patrones }] },
     });
 
-    // La lógica de dominio arrastra además la prohibición de SDK (RNF-03).
-    // ESLint reemplaza la regla completa en el bloque posterior, así que este
-    // repite los patrones de frontera en lugar de añadirse a ellos.
+    // ESLint reemplaza la regla completa en el bloque posterior en vez de
+    // sumarla, así que el bloque del dominio repite los patrones de frontera.
     bloques.push({
       name: `fronteras/${modulo}/dominio`,
       files: [
@@ -113,9 +108,7 @@ export function fronteras({ raiz = 'src' } = {}) {
       rules: {
         'no-restricted-imports': [
           'error',
-          {
-            patterns: [...patrones, { group: SDK_DE_PROVEEDORES, message: MSG_SDK }],
-          },
+          { patterns: [...patrones, { group: SDK_DE_PROVEEDORES, message: MSG_SDK }] },
         ],
       },
     });
@@ -129,8 +122,10 @@ export function fronteras({ raiz = 'src' } = {}) {
         'error',
         {
           patterns: [
-            { group: ['../**/modules', '../**/modules/**'], message: MSG_CORE_NO_IMPORTA_MODULOS },
-            { group: ['@modules/*', '@modules/*/**'], message: MSG_CORE_NO_IMPORTA_MODULOS },
+            {
+              group: MODULOS.flatMap(haciaTodoDe).concat('../**/modules', '../**/modules/**'),
+              message: MSG_CORE_NO_IMPORTA_MODULOS,
+            },
           ],
         },
       ],

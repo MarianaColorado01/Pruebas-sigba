@@ -33,9 +33,7 @@ export function base({ tsconfigRootDir } = {}) {
         ecmaVersion: 2022,
         sourceType: 'module',
         globals: { ...globals.node },
-        ...(tsconfigRootDir
-          ? { parserOptions: { projectService: true, tsconfigRootDir } }
-          : {}),
+        ...(tsconfigRootDir ? { parserOptions: { projectService: true, tsconfigRootDir } } : {}),
       },
       rules: {
         '@typescript-eslint/no-unused-vars': [
