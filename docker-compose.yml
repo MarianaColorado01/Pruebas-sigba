@@ -1,0 +1,29 @@
+# Postgres local para desarrollo diario (Arquitectura 7.1).
+#
+#   docker compose up -d
+#
+# Solo datos sintéticos. Nunca una copia de producción ni adjuntos reales.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sigba-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sigba
+      POSTGRES_PASSWORD: sigba
+      POSTGRES_DB: sigba
+      # Comparación y orden en español, como en Neon.
+      LANG: es_CO.utf8
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-datos:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sigba -d sigba']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-datos:

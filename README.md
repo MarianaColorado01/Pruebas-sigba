@@ -52,13 +52,12 @@ El flujo de trabajo, el formato de rama y la definición de terminado están en
 
 ## Equipos
 
-| Equipo   | Módulo                     |
-| -------- | -------------------------- |
-| Equipo 1 | `beneficiarios`            |
-| Equipo 2 | `inventario`               |
-| Equipo 3 | `plataforma` y `analitica` |
+| Equipo   | Módulo                          | Capitán                               |
+| -------- | ------------------------------- | ------------------------------------- |
+| Equipo 1 | `beneficiarios` (M2)            | Camilo Agudelo · @MiloAgudelo         |
+| Equipo 2 | `inventario` (M1)               | Juan Ospina · @poethy                 |
+| Equipo 3 | `plataforma` y `analitica` (M3) | Mariana Colorado · @MarianaColorado01 |
 
-Capitanes: @MiloAgudelo (equipo 3), @MarianaColorado01 y @poethy.
 Arquitectura e integración: Camilo Agudelo Jaramillo.
 
 ## Licencia
