@@ -1,0 +1,22 @@
+{
+  "name": "sigba",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Sistema Integrado de Gestión para Bancos de Alimentos",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@11.18.0",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=11.18.0"
+  },
+  "scripts": {
+    "lint": "pnpm -r --no-bail run lint",
+    "typecheck": "pnpm -r --no-bail run typecheck",
+    "test": "pnpm -r --no-bail run test",
+    "build": "pnpm -r run build",
+    "dev": "pnpm -r --parallel run dev",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "nuevo-modulo": "node scripts/nuevo-modulo.mjs"
+  }
+}
