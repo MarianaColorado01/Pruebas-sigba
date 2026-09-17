@@ -25,9 +25,9 @@ jobs:
     env:
       RAMA: ${{ github.head_ref }}
     steps:
-      # GitHub no ofrece la regla branch_name_pattern en repositorios de cuenta
-      # personal: las reglas de patrón son solo para repos de organización.
-      # Se verifica aquí, que bloquea el merge igual.
+      # GitHub no ofrece branch_name_pattern en repositorios de cuenta personal:
+      # las reglas de patrón son solo para repos de organización. Comprobarlo
+      # aquí bloquea el merge igual. Ver .github/rulesets/README.md.
       - name: El nombre de la rama sigue el formato de Linear
         run: |
           if [[ ! "$RAMA" =~ ^sba-[0-9]+-[a-z0-9-]+$ ]]; then

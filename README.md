@@ -13,11 +13,15 @@ septiembre al 25 de noviembre de 2026.
 | Docker      | para el Postgres local |
 
 ```bash
-corepack enable
+corepack prepare pnpm@11.18.0 --activate
 pnpm install
+cp .env.example .env
 docker compose up -d
 pnpm dev
 ```
+
+En Windows, `corepack enable` necesita una terminal de administrador; `corepack
+prepare` no.
 
 ## Estructura
 

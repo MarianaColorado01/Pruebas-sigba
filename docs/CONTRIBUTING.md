@@ -31,9 +31,10 @@ Node 24 (ver `.nvmrc`). Si usas nvm: `nvm use`.
    rama.
 
 3. **Trabaja con TDD en `services/`.** Prueba que falla, código que la pasa,
-   limpieza. Mínimo 70 % de cobertura en `services` (RNF-02).
+   limpieza. El check `test` mide la cobertura de `services/` y falla por debajo
+   del 70 % (RNF-02); no es un recordatorio, es una puerta.
 4. **Abre el PR** contra `main`. La plantilla trae la definición de terminado.
-5. **Una aprobación** y los cuatro checks en verde. Si tocas `core/`,
+5. **Una aprobación** y los cinco checks en verde. Si tocas `core/`,
    `packages/` o `prisma/`, además revisa el responsable de arquitectura.
 6. **Squash al mezclar.** `main` mantiene historial lineal.
 
@@ -56,12 +57,17 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm build
 
 Son los mismos que corre CI, más el check `rama`, que solo depende del nombre.
 
+`pnpm test` incluye la cobertura de `services/` y la prueba e2e que levanta
+`AppModule`. Esa e2e es la única que detecta un proveedor mal declarado: una
+prueba unitaria construye la clase a mano y nunca toca el contenedor de Nest.
+
 ## Definición de terminado
 
 Está en la plantilla de PR (`.github/pull_request_template.md`). En resumen:
 
 - Los cinco checks en verde.
-- Pruebas de lo que cambiaste; dominio con TDD y 70 % en `services`.
+- Pruebas de lo que cambiaste; dominio con TDD y 70 % en `services`, que mide el
+  check `test`.
 - El lint de fronteras sin errores.
 - Endpoints con JWT y rol (RNF-01); tablas con `banco_id`, RLS y prueba de
   aislamiento (ADR-07).
@@ -70,7 +76,7 @@ Está en la plantilla de PR (`.github/pull_request_template.md`). En resumen:
 
 ## Las fronteras entre módulos
 
-Tres reglas, y el lint las comprueba:
+Cuatro reglas, y el lint las comprueba:
 
 **Un módulo entra a otro solo por su `index.ts`.**
 
@@ -83,6 +89,9 @@ Si lo que necesitas no está exportado en el `index.ts` del otro módulo, no es
 API pública. Pídeselo a su equipo.
 
 **`core` no importa módulos funcionales.** La dependencia va en un solo sentido.
+
+**Nadie importa `analitica`,** ni siquiera por su `index.ts`. Solo expone
+endpoints HTTP y se alimenta de eventos.
 
 **`services/` y `events/` no importan SDK de proveedores.** Ni Prisma, ni Auth0,
 ni el cliente S3. Eso va detrás de un puerto de `core`, y el adaptador vive en

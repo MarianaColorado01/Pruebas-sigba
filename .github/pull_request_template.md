@@ -12,7 +12,7 @@ Cierra SBA-
 
 - [ ] Los checks de CI están en verde: `rama`, `lint`, `typecheck`, `test`, `build`.
 - [ ] Hay pruebas de lo que cambié; la lógica de dominio se escribió con TDD (RNF-02).
-- [ ] Cobertura de `services/` en 70 % o más (RNF-02).
+      El check `test` falla solo si `services/` baja del 70 %.
 - [ ] El lint de fronteras pasa sin errores: no importé rutas internas de otro módulo (Arquitectura 5.2).
 - [ ] La lógica de dominio no importa SDK de proveedores; van detrás de un puerto de `core` (RNF-03).
 - [ ] Todo endpoint nuevo exige JWT válido y rol autorizado (RNF-01).

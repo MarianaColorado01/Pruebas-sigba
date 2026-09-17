@@ -15,8 +15,8 @@ gh api --method PUT repos/MiloAgudelo/sigba/rulesets/23604539 \
 
 Por API los _status checks_ requeridos se declaran por nombre aunque el workflow
 no haya corrido nunca; por la interfaz de Settings solo aparecen los que ya
-corrieron al menos una vez. Por eso los cinco checks quedaron exigidos desde el
-primer minuto.
+corrieron al menos una vez. Por eso los cinco quedaron exigidos antes de que
+CI corriera la primera vez.
 
 Los nombres van sin tildes a propósito: `gh` en Windows los envía mal
 codificados y el ruleset queda con el nombre roto.
@@ -40,8 +40,8 @@ atribuyen a un colaborador del repositorio.
 ## El formato de rama no se puede exigir aquí
 
 Había un segundo ruleset con `branch_name_pattern`. **No existe en este plan.**
-Las reglas de patrón —`branch_name_pattern`, `commit_message_pattern`,
-`commit_author_email_pattern`, `tag_name_pattern`— solo están disponibles en
+Las reglas de patrón (`branch_name_pattern`, `commit_message_pattern`,
+`commit_author_email_pattern`, `tag_name_pattern`) solo están disponibles en
 repositorios propiedad de una organización. En un repositorio de cuenta
 personal, aunque el titular tenga GitHub Pro, la API responde:
 
@@ -49,15 +49,14 @@ personal, aunque el titular tenga GitHub Pro, la API responde:
 422  Invalid rule 'branch_name_pattern'
 ```
 
-Mover el repositorio a una organización gratuita empeoraría las cosas: los
-repositorios privados de una organización Free no tienen rulesets en absoluto, y
-se perdería la protección que hoy da el Pro personal. Haría falta GitHub Team,
-que se cobra por persona.
+Mover el repositorio a una organización gratuita deja menos protección, no más:
+los repositorios privados de una organización Free no tienen rulesets, así que se
+perdería lo que hoy da el Pro personal. Haría falta GitHub Team, que se cobra por
+persona.
 
-**Lo que hacemos en su lugar:** el job `rama` de `ci.yml` comprueba el nombre
-contra `^sba-[0-9]+-[a-z0-9-]+$` y es un check requerido. No impide crear la
-rama, pero impide mezclarla, que es lo que importa, y el mensaje de error
-explica cómo renombrarla.
+En su lugar, el job `rama` de `ci.yml` comprueba el nombre contra
+`^sba-[0-9]+-[a-z0-9-]+$` y es un check requerido. No impide crear la rama, pero
+impide mezclarla, y el mensaje de error explica cómo renombrarla.
 
-`enforcement: "evaluate"` —el modo que reporta sin bloquear— tampoco está en
-este plan: requiere Enterprise.
+`enforcement: "evaluate"`, el modo que reporta sin bloquear, tampoco está en este
+plan: requiere Enterprise.
