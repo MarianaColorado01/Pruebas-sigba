@@ -4,7 +4,7 @@ import request from 'supertest';
 import type { Server } from 'node:http';
 import { AppModule } from './../src/app.module.js';
 
-describe('AppController (e2e)', () => {
+describe('API (e2e)', () => {
   let app: INestApplication<Server>;
 
   beforeEach(async () => {
@@ -13,6 +13,7 @@ describe('AppController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api/v1');
     await app.init();
   });
 
