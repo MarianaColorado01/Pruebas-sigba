@@ -18,7 +18,14 @@
  */
 
 /** Módulos funcionales del backend. Sección 5.2. */
-export const MODULOS = ['plataforma', 'inventario', 'beneficiarios', 'analitica'];
+export const MODULOS_FUNCIONALES = ['plataforma', 'inventario', 'beneficiarios', 'analitica'];
+
+/**
+ * Todo lo que vive bajo `modules/` y queda sujeto a las fronteras.
+ * `health` no es un módulo de alcance: es la plantilla y la sonda del
+ * despliegue, pero se rige por las mismas reglas que los demás.
+ */
+export const MODULOS = [...MODULOS_FUNCIONALES, 'health'];
 
 /** Módulo que nadie puede importar: solo expone endpoints HTTP. */
 export const MODULO_SIN_CONSUMIDORES = 'analitica';

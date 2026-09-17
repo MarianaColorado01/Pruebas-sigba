@@ -4,8 +4,8 @@ export default defineConfig({
   test: {
     globals: true,
     root: './',
-    include: ['src/**/*.spec.ts'],
-    exclude: ['**/node_modules/**', '**/dist/**', 'test/**'],
+    include: ['src/**/*.spec.ts', 'test/**/*.spec.ts'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/*.e2e-spec.ts'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
