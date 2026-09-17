@@ -3,3 +3,6 @@ dist/
 build/
 coverage/
 docs/*.pdf
+
+# Referencias de aguas arriba de la skill stop-slop: no se reformatean
+.claude/skills/stop-slop/references/
