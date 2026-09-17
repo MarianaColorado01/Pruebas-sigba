@@ -1,0 +1,45 @@
+# Dueños de código de SIGBA
+#
+# No hay dueño global a propósito: con catorce personas y ~50 tickets en doce
+# semanas, un revisor único para todo el repositorio bloquea al equipo. La
+# protección de main ya exige una aprobación en cada PR; CODEOWNERS añade
+# revisión obligatoria solo donde el documento de arquitectura la pide.
+#
+# Gana la ÚLTIMA regla que coincide. Lo más específico va al final.
+
+# --- Superficies de contrato: revisión de arquitectura (Arquitectura 5.2) ---
+# «Un cambio de servicio público, DTO o evento exige revisión del responsable
+#  de arquitectura y del equipo consumidor.»
+/packages/shared-types/        @MiloAgudelo
+/packages/config/              @MiloAgudelo
+/apps/api/src/core/            @MiloAgudelo
+/apps/api/prisma/              @MiloAgudelo
+
+# --- Infraestructura del repositorio ---
+/.github/                      @MiloAgudelo
+/docker-compose.yml            @MiloAgudelo
+/pnpm-workspace.yaml           @MiloAgudelo
+/package.json                  @MiloAgudelo
+/scripts/                      @MiloAgudelo
+
+# --- Módulos: capitán de cada equipo ---
+# Equipo 1 · M2 Beneficiarios · Camilo Agudelo
+/apps/api/src/modules/beneficiarios/   @MiloAgudelo
+/apps/web/src/features/beneficiarios/  @MiloAgudelo
+
+# Equipo 2 · M1 Inventario · Juan Ospina
+/apps/api/src/modules/inventario/      @poethy
+/apps/web/src/features/inventario/     @poethy
+
+# Equipo 3 · M3 Plataforma y analítica · Mariana Colorado
+/apps/api/src/modules/plataforma/      @MarianaColorado01
+/apps/api/src/modules/analitica/       @MarianaColorado01
+/apps/web/src/features/plataforma/     @MarianaColorado01
+/apps/web/src/features/analitica/      @MarianaColorado01
+
+# --- La API pública de cada módulo es contrato compartido ---
+# Va al final para que gane sobre la regla del módulo.
+/apps/api/src/modules/*/index.ts       @MiloAgudelo
+
+# --- Decisiones de arquitectura: los tres capitanes ---
+/docs/adr/                     @MiloAgudelo @poethy @MarianaColorado01
