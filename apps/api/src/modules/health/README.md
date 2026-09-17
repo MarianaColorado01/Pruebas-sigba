@@ -18,9 +18,9 @@ que Fly.io consulta para saber si la máquina responde (SBA-7).
 
 Estructura de Arquitectura 5.3.
 
-## Las tres reglas que el lint comprueba
+## Las cuatro reglas que el lint comprueba
 
-**Uno.** Un módulo importa de otro solo por su `index.ts`. Esto pasa:
+**Un módulo importa de otro solo por su `index.ts`.** Esto pasa:
 
 ```ts
 import { StockService } from '../inventario/index.js';
@@ -35,19 +35,31 @@ import { StockService } from '../inventario/services/stock.service.js';
 Si lo que necesitas no está exportado en el `index.ts` del otro módulo, no es
 API pública. Pídeselo a su equipo; no lo tomes por la puerta de atrás.
 
-**Dos.** `core` no importa módulos funcionales. La dependencia va en un solo
-sentido (ADR-01).
+**`core` no importa módulos funcionales.** La dependencia va en un solo sentido
+(ADR-01).
 
-**Tres.** `services/` y `events/` no importan SDK de proveedores: ni Prisma, ni
-Auth0, ni el cliente S3. Eso vive detrás de un puerto de `core`, y el adaptador
-va en `repositories/` (RNF-03).
+**Nadie importa `analitica`,** ni siquiera por su `index.ts`. Solo expone
+endpoints HTTP y se alimenta de eventos (ADR-09).
+
+**`services/` y `events/` no importan SDK de proveedores:** ni Prisma, ni Auth0,
+ni el cliente S3. Eso vive detrás de un puerto de `core`, y el adaptador va en
+`repositories/` (RNF-03).
 
 La prueba que verifica que el lint falla está en
 `apps/api/test/fronteras.spec.ts`. Si alguien relaja la regla, esa prueba se
 pone roja.
 
-## Por qué el servicio recibe un reloj
+## Qué va en el constructor y qué no
 
-`SaludService` toma `() => Date` en el constructor. Así la prueba fija el
-momento sin parchear `Date` global. Mismo patrón para cualquier dependencia que
-haga la prueba lenta o no determinista: entra por el constructor.
+Las dependencias reales entran por el constructor y Nest las resuelve por tipo:
+otro servicio, un repositorio, un puerto de `core` con su token de inyección.
+
+Lo que **no** puede ir ahí es un tipo primitivo o una función suelta. Nest ve
+`Function` y busca un proveedor con ese tipo; no lo encuentra y la aplicación no
+arranca. Por eso `SaludService.consultar` recibe `ahora: Date = new Date()` como
+parámetro con valor por defecto en lugar de un reloj inyectado: la prueba fija el
+momento sin parchear `Date` global y sin tocar el contenedor.
+
+Ese fallo no lo atrapa ninguna prueba unitaria, porque en una prueba unitaria la
+clase se construye a mano. Lo atrapa `test/app.e2e-spec.ts`, que levanta
+`AppModule` entero. Por eso corre dentro de `pnpm test` y no aparte.

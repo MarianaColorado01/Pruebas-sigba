@@ -11,13 +11,15 @@ import type { EstadoDeSaludDto } from '../dto/estadoDeSalud.dto.js';
  */
 @Injectable()
 export class SaludService {
-  /** Permite fijar el reloj en las pruebas sin tocar `Date` global. */
-  constructor(private readonly ahora: () => Date = () => new Date()) {}
-
-  consultar(tiempoEnPieEnSegundos: number): EstadoDeSaludDto {
+  /**
+   * `ahora` entra por parámetro para que la prueba fije el momento sin parchear
+   * `Date` global. No va en el constructor: Nest resuelve por tipo, y un tipo
+   * función no le dice qué inyectar.
+   */
+  consultar(tiempoEnPieEnSegundos: number, ahora: Date = new Date()): EstadoDeSaludDto {
     return {
       estado: 'ok',
-      momento: this.ahora().toISOString(),
+      momento: ahora.toISOString(),
       tiempoEnPie: Math.floor(tiempoEnPieEnSegundos),
     };
   }
