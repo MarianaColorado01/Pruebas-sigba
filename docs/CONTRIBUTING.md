@@ -24,9 +24,11 @@ Node 24 (ver `.nvmrc`). Si usas nvm: `nvm use`.
    sba-24-recepcion-manual-con-red
    ```
 
-   Ese formato es obligatorio y lo verifica un ruleset de GitHub. Una rama con
-   otro nombre se rechaza al empujarla. El tipo de cambio (`feat`, `fix`,
-   `chore`) va en el mensaje del commit y en el título del PR, no en la rama.
+   Ese formato es obligatorio: el check `rama` de CI lo verifica y bloquea el
+   merge si no cuadra. Puedes empujar una rama con otro nombre, pero no
+   mezclarla; el error te dice cómo renombrarla. El tipo de cambio (`feat`,
+   `fix`, `chore`) va en el mensaje del commit y en el título del PR, no en la
+   rama.
 
 3. **Trabaja con TDD en `services/`.** Prueba que falla, código que la pasa,
    limpieza. Mínimo 70 % de cobertura en `services` (RNF-02).
@@ -52,13 +54,13 @@ El cuerpo explica **por qué**, no qué: el diff ya dice qué. Cierra el ticket 
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 
-Son los mismos cuatro que corre CI. Si pasan aquí, pasan allá.
+Son los mismos que corre CI, más el check `rama`, que solo depende del nombre.
 
 ## Definición de terminado
 
 Está en la plantilla de PR (`.github/pull_request_template.md`). En resumen:
 
-- Los cuatro checks en verde.
+- Los cinco checks en verde.
 - Pruebas de lo que cambiaste; dominio con TDD y 70 % en `services`.
 - El lint de fronteras sin errores.
 - Endpoints con JWT y rol (RNF-01); tablas con `banco_id`, RLS y prueba de

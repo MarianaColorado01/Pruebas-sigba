@@ -10,7 +10,7 @@ Cierra SBA-
 
 ## Definición de terminado
 
-- [ ] Los cuatro jobs de CI están en verde: `lint`, `typecheck`, `test`, `build`.
+- [ ] Los checks de CI están en verde: `rama`, `lint`, `typecheck`, `test`, `build`.
 - [ ] Hay pruebas de lo que cambié; la lógica de dominio se escribió con TDD (RNF-02).
 - [ ] Cobertura de `services/` en 70 % o más (RNF-02).
 - [ ] El lint de fronteras pasa sin errores: no importé rutas internas de otro módulo (Arquitectura 5.2).

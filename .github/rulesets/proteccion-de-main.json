@@ -1,5 +1,5 @@
 {
-  "name": "protección de main",
+  "name": "proteccion de main",
   "target": "branch",
   "enforcement": "active",
   "conditions": {
@@ -16,9 +16,15 @@
     }
   ],
   "rules": [
-    { "type": "deletion" },
-    { "type": "non_fast_forward" },
-    { "type": "required_linear_history" },
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "required_linear_history"
+    },
     {
       "type": "pull_request",
       "parameters": {
@@ -36,10 +42,21 @@
         "strict_required_status_checks_policy": true,
         "do_not_enforce_on_create": false,
         "required_status_checks": [
-          { "context": "lint" },
-          { "context": "typecheck" },
-          { "context": "test" },
-          { "context": "build" }
+          {
+            "context": "rama"
+          },
+          {
+            "context": "lint"
+          },
+          {
+            "context": "typecheck"
+          },
+          {
+            "context": "test"
+          },
+          {
+            "context": "build"
+          }
         ]
       }
     }

@@ -29,7 +29,13 @@ docs/         arquitectura, alcances, cronograma y ADR
 ```
 
 La estructura sigue la sección 5.3 del documento de arquitectura. Las reglas de
-frontera entre módulos están en la 5.2 y las verifica el lint.
+frontera entre módulos están en la 5.2 y las verifica el lint; la prueba que las
+ejerce está en `apps/api/test/fronteras.spec.ts`.
+
+```bash
+pnpm lint && pnpm typecheck && pnpm test && pnpm build   # lo mismo que corre CI
+pnpm nuevo-modulo <nombre>                               # módulo nuevo con la forma canónica
+```
 
 ## Cómo trabajamos
 

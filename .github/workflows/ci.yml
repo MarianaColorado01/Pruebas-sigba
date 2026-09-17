@@ -18,6 +18,33 @@ env:
   NODE_ENV: test
 
 jobs:
+  rama:
+    name: rama
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    env:
+      RAMA: ${{ github.head_ref }}
+    steps:
+      # GitHub no ofrece la regla branch_name_pattern en repositorios de cuenta
+      # personal: las reglas de patrón son solo para repos de organización.
+      # Se verifica aquí, que bloquea el merge igual.
+      - name: El nombre de la rama sigue el formato de Linear
+        run: |
+          if [[ ! "$RAMA" =~ ^sba-[0-9]+-[a-z0-9-]+$ ]]; then
+            echo "::error::La rama \"$RAMA\" no sigue el formato."
+            echo ""
+            echo "  Se espera:  sba-<numero>-<titulo-en-minusculas>"
+            echo "  Por ejemplo: sba-24-recepcion-manual-con-red"
+            echo ""
+            echo "  Usa el boton \"Copy git branch name\" del ticket en Linear."
+            echo "  Para renombrar una rama que ya existe:"
+            echo "    git branch -m sba-<numero>-<titulo>"
+            echo "    git push origin -u sba-<numero>-<titulo>"
+            echo "    git push origin --delete \"$RAMA\""
+            exit 1
+          fi
+          echo "Rama \"$RAMA\": correcta."
+
   lint:
     name: lint
     runs-on: ubuntu-latest
