@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build:packages": "pnpm --filter \"./packages/*\" run build",
-    "lint": "pnpm -r --no-bail run lint",
+    "lint": "eslint . --max-warnings 0 && pnpm -r --no-bail run lint",
     "typecheck": "pnpm run build:packages && pnpm -r --no-bail run typecheck",
     "test": "pnpm run build:packages && pnpm -r --no-bail run test",
     "build": "pnpm -r run build",
