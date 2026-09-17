@@ -13,7 +13,7 @@ gh api --method PUT repos/MiloAgudelo/sigba/rulesets/RULESET_ID \
   --input .github/rulesets/proteccion-de-main.json
 ```
 
-Por API los *status checks* requeridos se declaran por nombre aunque el workflow
+Por API los _status checks_ requeridos se declaran por nombre aunque el workflow
 no haya corrido nunca; por la interfaz de Settings solo aparecen los que ya
 corrieron al menos una vez.
 
@@ -22,12 +22,12 @@ corrieron al menos una vez.
 **`proteccion-de-main.json`** · Rama por defecto. Prohíbe borrarla y el
 force-push, exige historial lineal, un PR con una aprobación y revisión de Code
 Owners, resolución de los hilos de revisión, y los cuatro checks de `ci.yml` en
-verde con la rama al día. Solo permite *squash*.
+verde con la rama al día. Solo permite _squash_.
 
 El rol **Repository admin** tiene bypass en modo `always`. Eso cubre el arranque
 de la Iteración 0 y las emergencias. Consecuencia: **nadie más puede tener
 permiso Admin sobre el repositorio**, porque el bypass se concede por rol, no por
-persona. Los catorce colaboradores van con permiso *Write*.
+persona. Los catorce colaboradores van con permiso _Write_.
 
 **`formato-de-rama.json`** · Todas las ramas **menos `main`**. Exige el nombre que
 genera Linear (`sba-<número>-<título>`). Excluir `main` no es opcional: `main` no
