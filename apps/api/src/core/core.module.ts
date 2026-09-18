@@ -15,9 +15,11 @@ import { Global, Module } from '@nestjs/common';
  *   SBA-21 · auditoría base
  *   SBA-30 · outbox transaccional
  */
+import { PrismaService } from './database/prisma.service.js';
+
 @Global()
 @Module({
-  providers: [],
-  exports: [],
+  providers: [PrismaService],
+  exports: [PrismaService],
 })
 export class CoreModule {}

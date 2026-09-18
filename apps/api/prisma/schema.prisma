@@ -1,0 +1,129 @@
+// Configuración de Prisma para SIGBA (ADR-05, ADR-07)
+// Multi-schema: core, plataforma, inventario, beneficiarios, analitica
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["core", "plataforma", "inventario", "beneficiarios", "analitica"]
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// Schema: plataforma
+// ==========================================
+
+model Red {
+  id            String   @id @default(uuid()) @db.Uuid
+  nombre        String   @db.VarChar(200)
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz
+
+  bancos Banco[]
+
+  @@map("red")
+  @@schema("plataforma")
+}
+
+model Banco {
+  id            String   @id @default(uuid()) @db.Uuid
+  redId         String   @map("red_id") @db.Uuid
+  nombre        String   @db.VarChar(200)
+  codigo        String   @unique @db.VarChar(20)
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz
+
+  red           Red              @relation(fields: [redId], references: [id])
+  bodegas       Bodega[]
+  parametros    ParametroBanco[]
+  usuariosRoles UsuarioRol[]
+
+  @@map("banco")
+  @@schema("plataforma")
+}
+
+model Bodega {
+  id            String   @id @default(uuid()) @db.Uuid
+  bancoId       String   @map("banco_id") @db.Uuid
+  nombre        String   @db.VarChar(200)
+  direccion     String?  @db.VarChar(500)
+  activa        Boolean  @default(true)
+  creadoPor     String?  @map("creado_por") @db.VarChar(100)
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz
+
+  banco Banco @relation(fields: [bancoId], references: [id])
+
+  @@map("bodega")
+  @@schema("plataforma")
+}
+
+model Usuario {
+  id            String   @id @default(uuid()) @db.Uuid
+  auth0Sub      String   @unique @map("auth0_sub") @db.VarChar(200)
+  email         String   @unique @db.VarChar(200)
+  nombre        String   @db.VarChar(200)
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz
+
+  roles UsuarioRol[]
+
+  @@map("usuario")
+  @@schema("plataforma")
+}
+
+model Rol {
+  id            String   @id @default(uuid()) @db.Uuid
+  codigo        String   @unique @db.VarChar(50)
+  nombre        String   @db.VarChar(100)
+  descripcion   String?  @db.VarChar(500)
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz
+
+  usuarios UsuarioRol[]
+
+  @@map("rol")
+  @@schema("plataforma")
+}
+
+model UsuarioRol {
+  id            String   @id @default(uuid()) @db.Uuid
+  usuarioId     String   @map("usuario_id") @db.Uuid
+  rolId         String   @map("rol_id") @db.Uuid
+  bancoId       String?  @map("banco_id") @db.Uuid
+  institucionId String?  @map("institucion_id") @db.Uuid
+  activo        Boolean  @default(true)
+  creadoPor     String?  @map("creado_por") @db.VarChar(100)
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+  rol     Rol     @relation(fields: [rolId], references: [id])
+  banco   Banco?  @relation(fields: [bancoId], references: [id])
+
+  @@unique([usuarioId, rolId, bancoId, institucionId])
+  @@map("usuario_rol")
+  @@schema("plataforma")
+}
+
+model ParametroBanco {
+  id            String    @id @default(uuid()) @db.Uuid
+  bancoId       String    @map("banco_id") @db.Uuid
+  clave         String    @db.VarChar(100)
+  valor         String    @db.Text
+  vigenteDesde  DateTime  @default(now()) @map("vigente_desde") @db.Timestamptz
+  vigenteHasta  DateTime? @map("vigente_hasta") @db.Timestamptz
+  creadoPor     String?   @map("creado_por") @db.VarChar(100)
+  creadoEn      DateTime  @default(now()) @map("creado_en") @db.Timestamptz
+  actualizadoEn DateTime  @updatedAt @map("actualizado_en") @db.Timestamptz
+
+  banco Banco @relation(fields: [bancoId], references: [id])
+
+  @@index([bancoId, clave, vigenteDesde])
+  @@map("parametro_banco")
+  @@schema("plataforma")
+}

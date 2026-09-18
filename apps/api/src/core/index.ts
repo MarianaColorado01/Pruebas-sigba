@@ -9,3 +9,4 @@
  */
 
 export { CoreModule } from './core.module.js';
+export * from './database/index.js';

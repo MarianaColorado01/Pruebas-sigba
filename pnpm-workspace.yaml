@@ -2,6 +2,12 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true
+
 # Un solo lugar donde se fijan las versiones compartidas.
 # «Fijar versiones compatibles en el lockfile de la Iteración 0» (Arquitectura 5.1).
 # Los paquetes las referencian con "catalog:" en vez de repetir el número.
@@ -9,6 +15,10 @@ catalog:
   # Lenguaje y tipos
   typescript: 6.0.3
   '@types/node': ^24.13.5
+
+  # Base de datos (ADR-05, SBA-6)
+  prisma: ^6.19.3
+  '@prisma/client': ^6.19.3
 
   # Lint y formato
   eslint: ^10.10.0

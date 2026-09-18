@@ -76,6 +76,30 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-latest
+
+    # RNF-01 pide la prueba de aislamiento «en el pipeline, con cero filas de
+    # otro banco». Eso solo lo demuestra Postgres: una simulación de las
+    # políticas en JavaScript seguiría verde con un USING (true).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sigba
+          POSTGRES_PASSWORD: sigba
+          POSTGRES_DB: sigba
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sigba -d sigba"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Datos sintéticos y base efímera: nunca una copia de producción
+      # (Arquitectura 7.1).
+      DATABASE_URL: postgresql://sigba:sigba@localhost:5432/sigba
+
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -84,6 +108,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: migraciones
+        run: pnpm --filter @sigba/api exec prisma migrate deploy
       - run: pnpm run test
 
   build:
