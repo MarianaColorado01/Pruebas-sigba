@@ -6,6 +6,19 @@
 # revisión obligatoria solo donde el documento de arquitectura la pide.
 #
 # Gana la ÚLTIMA regla que coincide. Lo más específico va al final.
+#
+# Hay dos clases de ruta sensible y no se gobiernan igual.
+#
+# CONTRATO: dueño único, el responsable de arquitectura. GitHub acepta a
+# cualquiera de los dueños listados, así que añadir capitanes aquí los volvería
+# sustituibles y un cambio de contrato podría entrar sin arquitectura ni equipo
+# consumidor, que es justo lo contrario de lo que pide 5.2.
+# Consecuencia asumida: cuando Camilo escriba en estas rutas, GitHub no deja que
+# se apruebe a sí mismo. Pide revisión a un capitán igual y mezcla con el bypass;
+# la revisión ocurre aunque GitHub no pueda exigirla.
+#
+# INFRAESTRUCTURA: los tres capitanes. Aquí no hay contrato que proteger, y un
+# dueño único deja el repositorio parado si esa persona falta una semana de corte.
 
 # --- Superficies de contrato: revisión de arquitectura (Arquitectura 5.2) ---
 # «Un cambio de servicio público, DTO o evento exige revisión del responsable
@@ -15,12 +28,13 @@
 /apps/api/src/core/            @MiloAgudelo
 /apps/api/prisma/              @MiloAgudelo
 
-# --- Infraestructura del repositorio ---
-/.github/                      @MiloAgudelo
-/docker-compose.yml            @MiloAgudelo
-/pnpm-workspace.yaml           @MiloAgudelo
-/package.json                  @MiloAgudelo
-/scripts/                      @MiloAgudelo
+# --- Infraestructura del repositorio: cualquiera de los tres capitanes ---
+/.github/                      @MiloAgudelo @poethy @MarianaColorado01
+/.coderabbit.yaml              @MiloAgudelo @poethy @MarianaColorado01
+/docker-compose.yml            @MiloAgudelo @poethy @MarianaColorado01
+/pnpm-workspace.yaml           @MiloAgudelo @poethy @MarianaColorado01
+/package.json                  @MiloAgudelo @poethy @MarianaColorado01
+/scripts/                      @MiloAgudelo @poethy @MarianaColorado01
 
 # --- Módulos: capitán de cada equipo ---
 # Equipo 1 · M2 Beneficiarios · Camilo Agudelo

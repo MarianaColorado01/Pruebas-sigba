@@ -1,0 +1,298 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# Revisión automática de PRs. Documentación: https://docs.coderabbit.ai
+#
+# CodeRabbit lee este fichero desde la RAMA BASE del PR, no desde la rama de
+# trabajo. Un cambio aquí no surte efecto hasta que entra en `main`.
+
+language: es
+
+# Máximo 250 caracteres: por encima, CodeRabbit descarta el fichero entero y
+# usa sus valores por defecto sin más aviso que una nota en el PR.
+tone_instructions: >-
+  Español, directo y concreto. Señala archivo y línea, explica qué falla y
+  propón la corrección mínima. Cita el ADR o RNF cuando exista. Son
+  estudiantes: explica el porqué. Nada de comentarios cosméticos.
+
+# Con un solo asiento pagado, quien no lo tiene sigue recibiendo algo mientras
+# esto esté en true; qué exactamente (revisión completa o solo resumen del PR)
+# está por comprobar, porque la documentación de CodeRabbit se contradice.
+#
+# Requiere que la asignación de asientos esté en «Manual approval» en su panel.
+# En «Auto-approval» se provisiona una licencia y se cobra el prorrateo cuando
+# alguien sin asiento abre un PR.
+enable_free_tier: true
+early_access: false
+
+reviews:
+  # `chill` frente a `assertive`: con cinco checks bloqueantes ya cubriendo
+  # formato, tipos, fronteras y cobertura, un bot quisquilloso solo enseña al
+  # equipo a ignorarlo.
+  profile: chill
+
+  # CodeRabbit aconseja; no bloquea. La puerta siguen siendo los cinco checks
+  # y la aprobación humana del ruleset de `main`.
+  request_changes_workflow: false
+
+  high_level_summary: true
+  poem: false
+  collapse_walkthrough: true
+  changed_files_summary: true
+  sequence_diagrams: true
+  abort_on_close: true
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    base_branches:
+      - main
+
+  # Lo que CI no puede comprobar. El lint ya cubre fronteras entre módulos y la
+  # prohibición de SDK en el dominio; la cobertura la mide `test`; el formato lo
+  # pone prettier. Repetir eso aquí solo añade ruido.
+  path_instructions:
+    - path: 'apps/api/prisma/**'
+      instructions: >-
+        Aislamiento entre bancos: es el atributo de calidad número uno porque
+        SIGBA guarda datos de población vulnerable, incluidos menores (1.2).
+
+        Toda tabla operativa lleva `banco_id` y política RLS con USING y WITH
+        CHECK; FORCE RLS cuando el rol propietario pueda eludirla (ADR-07). Una
+        tabla nueva sin política, o sin prueba de aislamiento que demuestre cero
+        filas de otro banco, es un hallazgo bloqueante.
+
+        Excepción: las entidades globales `red`, `rol` y `usuario` no llevan
+        `banco_id` y tienen permisos propios (ADR-07, anexo B). No las reclames
+        por eso; reclama si les falta su propio control de acceso.
+
+        `movimiento` y `auditoria` son append-only: sin UPDATE, sin DELETE y sin
+        `actualizado_en` (ADR-08, anexo B).
+
+        No hay claves foráneas entre schemas: la referencia va por identificador
+        y la valida el servicio dueño. Señala las FK cruzadas y pregunta cómo se
+        evitan las referencias huérfanas al desactivar (5.2).
+
+        Cada módulo escribe en su schema. La excepción son las funciones
+        acotadas que insertan en `core.outbox` y `core.auditoria` dentro de la
+        transacción del dominio; cualquier otra concesión de escritura sobre
+        tablas ajenas es un hallazgo.
+
+    - path: 'apps/api/src/modules/**/*.ts'
+      instructions: >-
+        Atomicidad: movimiento, saldo derivado, auditoría y outbox confirman o
+        revierten juntos, en la misma transacción y con el mismo cliente Prisma
+        transaccional (ADR-08, ADR-09). Un `await` a algo que queda fuera de la
+        transacción rompe esa garantía; señálalo con el escenario concreto.
+
+        Idempotencia: toda escritura de negocio registra la clave
+        `(banco_id, comando_id)` y el hash de la carga. Un reintento con la
+        misma carga devuelve el resultado previo; la misma clave con otra carga
+        devuelve 409 (6.1). El celular reenvía comandos: una escritura sin esta
+        clave duplica inventario.
+
+        El stock no se edita. Es un saldo derivado del libro, con bloqueo por
+        banco, bodega y lote, actualización condicional y CHECK no negativo
+        (ADR-08).
+
+        Valoración: sin precio vigente aprobado, la recepción confirma
+        cantidades y queda marcada como valoración pendiente. Nunca cero, nunca
+        un precio vencido, y nunca bloquear la recepción por falta de precio
+        (ADR-13). La valoración tardía se enlaza al movimiento sin editarlo.
+
+        Un `eslint-disable` sobre las reglas de frontera es un hallazgo
+        bloqueante, no un atajo: son lo único que sostiene el trabajo en
+        paralelo de tres equipos (5.2).
+
+        Nombres del dominio en español, nombres técnicos en inglés (RS-09).
+
+    - path: 'apps/api/src/modules/*/controllers/**'
+      instructions: >-
+        Todo endpoint exige JWT válido y rol autorizado antes de tocar datos
+        (RNF-01). Un endpoint sin guard es un hallazgo bloqueante.
+
+        Excepción: `modules/health` es la sonda que consulta Fly.io y va sin
+        autenticar a propósito (SBA-7). Una sonda autenticada no sirve de sonda.
+
+        TypeScript no valida JSON externo: lo que entra por HTTP se valida en
+        ejecución con class-validator (ADR-04). Un DTO tipado sin validación da
+        una falsa sensación de seguridad.
+
+        Los controladores traducen HTTP y nada más. Una regla de negocio aquí es
+        una regla que nadie puede probar sin levantar el servidor.
+
+    - path: 'apps/api/src/modules/beneficiarios/**'
+      instructions: >-
+        Datos personales de población vulnerable, incluidos menores. El documento
+        va cifrado y la unicidad se resuelve con huella HMAC por banco, sobre
+        `(banco, tipo, huella)` (anexo B).
+
+        Nada de datos personales en logs, trazas de Sentry ni cargas de evento
+        (RNF-M3-08, 8.6). Revisa también los mensajes de error.
+
+        Una persona mantiene una sola membresía activa dentro de cada banco
+        (RA-03). Una segunda membresía activa abre alerta de duplicidad; no se
+        resuelve borrando.
+
+        Este módulo consume `SalidaRegistrada` para estimar cobertura y no
+        escribe inventario ni descuenta stock (ADR-14). El resultado es cobertura
+        estimada, nunca entrega individual acreditada.
+
+    - path: 'apps/api/src/core/**'
+      instructions: >-
+        Los proveedores entran por un puerto definido aquí; el SDK vive en el
+        adaptador (RNF-03, ADR-11). Un SDK importado en core sin puerto delante
+        ata todo el sistema al proveedor.
+
+        `core` no importa módulos funcionales, en ningún sentido y por ninguna
+        ruta (5.2, ADR-01).
+
+        El acceso al outbox y a la auditoría desde el dominio es acotado: sin
+        UPDATE ni DELETE sobre tablas de core desde roles de dominio (5.2).
+
+    - path: 'packages/shared-types/**'
+      instructions: >-
+        Esto es contrato compartido entre la API y la PWA. Un cambio aquí exige
+        revisión del responsable de arquitectura y del equipo consumidor (5.2).
+
+        Comprueba que el PR actualice a los consumidores en el mismo cambio: para
+        eso hay monorepo. Si el contrato cambia de forma incompatible, pregunta
+        por la versión y qué pasa con los eventos ya emitidos (ADR-09).
+
+    - path: 'apps/web/src/offline/**'
+      instructions: >-
+        Local-first: un registro guardado en el dispositivo no confirma
+        inventario en el servidor. La interfaz tiene que decir «pendiente de
+        sincronizar» hasta que la API responda (ADR-10, 6.1).
+
+        Cada comando lleva `comando_id` UUIDv7, banco, usuario y versión, y se
+        envía respetando el orden de dependencia.
+
+        El stock en caché puede estar desactualizado: se avisa, no se disfraza de
+        dato fresco. Dos celulares pueden despachar lo mismo.
+
+        Un rechazo por falta de stock no borra una entrega física ya hecha:
+        conserva el comando en conflicto con su motivo.
+
+    - path: 'apps/web/src/**/*.tsx'
+      instructions: >-
+        Quien usa esto es un compañero de bodega con guantes, a contraluz y con
+        prisa (1.3). Mira tamaños de toque, contraste y cuántos pasos cuesta
+        registrar algo. Pocas pantallas y botones grandes.
+
+        Un icono que acompaña texto lleva `aria-hidden`; un botón cuyo único
+        contenido es un icono necesita nombre accesible.
+
+    - path: 'apps/web/src/**/*.{ts,tsx}'
+      instructions: >-
+        El token de Auth0 vive en memoria, nunca en localStorage, sessionStorage
+        ni IndexedDB (ADR-06). El sitio donde se añade a las peticiones es
+        `shared/clienteHttp.ts`, que es `.ts`: la regla vale para todo el código
+        de la PWA, no solo para los componentes.
+
+        Los datos personales de beneficiarios pasan también por aquí:
+        formularios, mensajes de error, telemetría y la cola local. No se
+        registran en consola, no viajan a Sentry y no se guardan en IndexedDB
+        sin cifrar (8.6, RNF-04). El pipeline no tiene ningún control de
+        privacidad que lo atrape.
+
+    - path: 'apps/web/src/ui/**'
+      instructions: >-
+        Los componentes de shadcn llegan del registro, pero a partir de ahí el
+        código es nuestro y se edita. Cuando el diff los toque, revisa la
+        modificación local, no el componente de origen.
+
+        Lo que más importa aquí son los tamaños de toque y el contraste: quien
+        usa esto trabaja con guantes, a contraluz y con prisa (1.3). Un cambio
+        que reduzca el área de toque o baje el contraste es un hallazgo aunque
+        se vea mejor en el portátil de quien lo escribió.
+
+    - path: '**/*.spec.ts'
+      instructions: >-
+        Las pruebas afirman comportamiento, no implementación. Una prueba que
+        repite la estructura del código se rompe con cada refactor y no detecta
+        ningún fallo.
+
+        El dominio se prueba sin levantar el contenedor de Nest ni la base de
+        datos. Si una prueba de `services/` necesita ambos, probablemente la
+        lógica está en la capa equivocada.
+
+        Señala las pruebas que no pueden fallar: sin aserción, con aserción sobre
+        un valor que el propio test fijó, o con el caso de error sin cubrir.
+
+    - path: '.github/**'
+      instructions: >-
+        Un error aquí bloquea a catorce personas a la vez. Comprueba que los
+        nombres de los jobs sigan coincidiendo con los checks requeridos del
+        ruleset (`rama`, `lint`, `typecheck`, `test`, `build`): renombrar un job
+        deja su check requerido esperando para siempre.
+
+        Ningún workflow imprime secretos ni los pasa por argumentos de línea de
+        comandos. El pipeline corre con datos sintéticos y sin credenciales de
+        producción (7.2).
+
+  path_filters:
+    - '!pnpm-lock.yaml'
+    - '!**/dist/**'
+    - '!**/coverage/**'
+    - '!docs/*.pdf'
+    - '!**/*.woff2'
+    - '!apps/web/public/**'
+
+  tools:
+    # Lo que ya corre en CI como check requerido no se repite aquí: dos voces
+    # diciendo lo mismo entrenan al equipo a saltarse las dos.
+    eslint:
+      enabled: false
+    oxlint:
+      enabled: false
+    biome:
+      enabled: false
+    # Prettier formatea el markdown. markdownlint añadiría reglas semánticas que
+    # prettier no ve (saltos de nivel de encabezado, enlaces vacíos, imágenes sin
+    # texto alternativo), pero sobre catorce ADR y una veintena de documentos
+    # genera una oleada de hallazgos de estilo que ahoga lo que importa. Apagado
+    # a sabiendas, no por descuido.
+    markdownlint:
+      enabled: false
+
+    # Lo que CI no cubre.
+    actionlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    # Para cuando entre el esquema con SBA-6.
+    prismaLint:
+      enabled: true
+
+    # Búsqueda de secretos. Hoy nada los escanea, y la arquitectura es tajante
+    # en que los secretos viven en los servicios y no en Git (5.3). Se activa
+    # cambiando este valor a true.
+    gitleaks:
+      enabled: false
+    semgrep:
+      enabled: false
+
+chat:
+  auto_reply: true
+  art: false
+  integrations:
+    linear:
+      usage: enabled
+
+knowledge_base:
+  # Lee CONTRIBUTING y los README de módulo como guía del repositorio.
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - 'docs/CONTRIBUTING.md'
+      - 'apps/api/src/modules/health/README.md'
+      - 'apps/api/src/core/README.md'
+      - 'apps/web/src/ui/README.md'
+  # Linear es la fuente de verdad: que contraste el PR contra su ticket.
+  linear:
+    usage: enabled
+    team_keys:
+      - SBA
+  learnings:
+    scope: local

@@ -109,6 +109,55 @@ pnpm nuevo-modulo <nombre>
 Crea la estructura de Arquitectura 5.3. Después: regístralo en `app.module.ts`,
 escribe su responsabilidad, y añade la ruta a `.github/CODEOWNERS`.
 
+## Revisión automática
+
+CodeRabbit revisa cada PR contra `main` y comenta en español. **No bloquea el
+merge**: la puerta siguen siendo los cinco checks y la aprobación humana. Si se
+equivoca, respóndele en el hilo y sigue.
+
+No repite lo que ya cubre CI. El formato lo pone prettier, las fronteras y el
+veto a los SDK los comprueba el lint, y la cobertura la mide `test`. CodeRabbit
+mira lo que ninguna herramienta puede ver: que una tabla nueva traiga `banco_id`
+y su política RLS, que movimiento, saldo, auditoría y outbox confirmen en la
+misma transacción, que la escritura lleve clave de idempotencia, y que no se
+escape un dato personal a un log o a un evento.
+
+Las reglas están en `.coderabbit.yaml`, en la raíz. Si una te parece equivocada,
+cámbiala por PR: son instrucciones, no dogma. **Ojo**: CodeRabbit lee ese fichero
+desde la rama base, así que un cambio no surte efecto hasta que entra en `main`.
+
+### Cuando el dueño de la ruta eres tú
+
+Las rutas de contrato (`core/`, `packages/`, `prisma/`, los `index.ts` de módulo)
+tienen un solo dueño: el responsable de arquitectura. GitHub acepta a cualquiera
+de los dueños que se listen, así que añadir más capitanes ahí los volvería
+intercambiables y un cambio de contrato podría entrar sin arquitectura ni equipo
+consumidor, justo al revés de lo que pide la sección 5.2.
+
+El precio de eso: cuando el propio responsable escribe en esas rutas, GitHub no
+le deja aprobarse. Pide revisión a un capitán de todos modos y mezcla con el
+bypass. La revisión ocurre aunque GitHub no pueda exigirla; saltársela porque se
+puede es el único punto donde el bypass quita una red propia.
+
+La infraestructura del repositorio (`.github/`, `.coderabbit.yaml`, `scripts/`,
+los manifiestos de la raíz) la firma cualquiera de los tres capitanes: ahí no hay
+contrato que proteger y un dueño único deja el repositorio parado si esa persona
+falta una semana de corte.
+
+### Sobre la licencia
+
+El plan gratuito de CodeRabbit no cubre repositorios privados como este, así que
+hay **un asiento pagado**. Quien no tiene asiento sigue recibiendo algo mientras
+`enable_free_tier` esté activo, pero la documentación de CodeRabbit se
+contradice sobre qué: su página de asientos habla de revisiones y el propio bot
+dice que son solo resúmenes de PR. **Está por comprobar**, y se comprueba solo:
+cuando alguien sin asiento abra un PR, se ve qué llega.
+
+Eso depende de que la asignación de asientos esté en **Manual approval** en el
+panel de CodeRabbit. En **Auto-approval**, abrir un PR sin asiento provisiona
+una licencia y genera un cobro prorrateado: con catorce personas, la factura se
+dispara sola.
+
 ## Cambios de contrato
 
 Un cambio en `packages/shared-types`, en el `index.ts` de un módulo o en un
