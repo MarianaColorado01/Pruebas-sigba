@@ -21,6 +21,16 @@ export default [
     },
   },
   {
+    name: 'web/shadcn',
+    files: ['src/ui/**/*.tsx'],
+    rules: {
+      // Los componentes de shadcn exportan el componente y sus variantes desde
+      // el mismo fichero. Es su forma, no un descuido: separarlas obligaría a
+      // editar cada componente que llega del registro.
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
     name: 'web/fronteras',
     files: ['src/features/**/*.{ts,tsx}'],
     rules: {

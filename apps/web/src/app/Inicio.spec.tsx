@@ -8,7 +8,7 @@ describe('Inicio', () => {
 
     render(<Inicio />);
 
-    expect(screen.getByText(/Sin señal/)).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/Sin señal/);
   });
 
   it('indica que hay señal cuando el navegador está en línea', () => {
@@ -16,6 +16,6 @@ describe('Inicio', () => {
 
     render(<Inicio />);
 
-    expect(screen.getByText('Con señal')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Con señal');
   });
 });

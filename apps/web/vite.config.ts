@@ -4,6 +4,8 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // Vite resuelve el alias @/* leyendo tsconfig.app.json. Un solo sitio donde vive.
+  resolve: { tsconfigPaths: true },
   plugins: [
     react(),
     tailwindcss(),
@@ -25,6 +27,15 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+        // Inter trae siete subconjuntos. El español vive entero en latin y
+        // latin-ext; los demás solo serían 85 KB guardados en el celular del
+        // operario para nada. Siguen en el build, así que si alguna vez hace
+        // falta un glifo, el navegador lo pide con red (ADR-10).
+        globIgnores: [
+          '**/inter-cyrillic*.woff2',
+          '**/inter-greek*.woff2',
+          '**/inter-vietnamese*.woff2',
+        ],
         // La API nunca se sirve desde caché: el stock desactualizado se marca
         // en la interfaz, no se disfraza de dato fresco (ADR-10).
         navigateFallbackDenylist: [/^\/api\//],

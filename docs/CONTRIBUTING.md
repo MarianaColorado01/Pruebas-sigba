@@ -100,6 +100,18 @@ ni el cliente S3. Eso va detrás de un puerto de `core`, y el adaptador vive en
 La referencia viva es `apps/api/src/modules/health`. La prueba que ejerce las
 reglas está en `apps/api/test/fronteras.spec.ts`.
 
+## Interfaz
+
+La PWA usa shadcn sobre Base UI, con Inter autoalojada y HugeIcons. Los
+componentes viven en `apps/web/src/ui`:
+
+```bash
+pnpm --filter @sigba/web dlx shadcn@latest add dialog
+```
+
+Antes de escribir un componente a mano, mira si shadcn ya lo trae. Los detalles
+y las razones están en `apps/web/src/ui/README.md`.
+
 ## Módulo nuevo
 
 ```bash
