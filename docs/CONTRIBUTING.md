@@ -178,6 +178,16 @@ evento es un cambio de contrato. Exige revisión del responsable de arquitectura
 
 Contrato y consumidores cambian en el mismo PR: para eso tenemos un monorepo.
 
+## Documentos de un ticket
+
+Los entregables que no son código (informes, mapeos, hojas de cálculo) van en
+`docs/SBA-NN/`, con un `README.md` que diga qué es cada archivo, el resultado y
+sus límites. Entran por PR como cualquier cambio, con el formato de rama y de
+commit de arriba (tipo `docs`), y los aprueba arquitectura.
+
+Si el documento cambia una decisión, enlázalo desde el ADR que corresponda en
+vez de copiar su contenido.
+
 ## Datos
 
 Solo datos sintéticos, en todos los ambientes menos producción. No se clona

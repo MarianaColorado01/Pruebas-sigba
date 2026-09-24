@@ -56,3 +56,11 @@ tardía sin editar movimientos.
 
 Vigencia, bandas y criterio contable siguen pendientes. El anexo D del documento
 de arquitectura recoge la investigación.
+
+## Nota de verificación · SBA-14
+
+La cobertura de SIPSA-P sobre un catálogo de 54 referencias armado por el
+equipo es del 78 % (cubierto o parcial); lo que queda fuera es casi todo aseo y
+pan fresco. No es todavía la cobertura de los códigos del Banco: falta
+recalcularla sobre los 54 códigos de SBA-12. El informe, el mapeo producto →
+serie y sus límites están en [docs/SBA-14](../SBA-14/README.md).
