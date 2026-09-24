@@ -127,3 +127,81 @@ model ParametroBanco {
   @@map("parametro_banco")
   @@schema("plataforma")
 }
+
+// ==========================================
+// Schema: inventario
+// ==========================================
+
+// Las FK dentro del banco son compuestas (banco_id, id). Una FK simple la
+// comprueba Postgres sin RLS, así que dejaría colgar un producto del banco A
+// de una categoría del banco B.
+
+/// Un código del Banco (C801, G103), que agrupa productos en cualquier
+/// presentación. La línea (Cereales, Grasas) agrupa códigos en pantalla.
+model Categoria {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoId        String   @map("banco_id") @db.Uuid
+  /// Sin código, los productos de la categoría quedan pendientes de código.
+  codigo         String?  @db.VarChar(20)
+  nombre         String   @db.VarChar(100)
+  linea          String?  @db.VarChar(100)
+  /// Los productos que el Banco lista bajo el código, para orientar al operario.
+  descripcion    String?  @db.Text
+  activa         Boolean  @default(true)
+  creadoPor      String?  @map("creado_por") @db.VarChar(100)
+  actualizadoPor String?  @map("actualizado_por") @db.VarChar(100)
+  creadoEn       DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  actualizadoEn  DateTime @default(now()) @updatedAt @map("actualizado_en") @db.Timestamptz
+
+  productos Producto[]
+
+  @@unique([bancoId, id])
+  // El nombre se repite en la hoja del Banco (cuatro «Otros alimentos»); el
+  // código no.
+  @@unique([bancoId, codigo])
+  @@map("categoria")
+  @@schema("inventario")
+}
+
+model Producto {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoId        String   @map("banco_id") @db.Uuid
+  categoriaId    String   @map("categoria_id") @db.Uuid
+  nombre         String   @db.VarChar(200)
+  activo         Boolean  @default(true)
+  creadoPor      String?  @map("creado_por") @db.VarChar(100)
+  actualizadoPor String?  @map("actualizado_por") @db.VarChar(100)
+  creadoEn       DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  actualizadoEn  DateTime @default(now()) @updatedAt @map("actualizado_en") @db.Timestamptz
+
+  categoria   Categoria    @relation(fields: [bancoId, categoriaId], references: [bancoId, id])
+  referencias Referencia[]
+
+  @@unique([bancoId, id])
+  @@unique([bancoId, nombre])
+  @@map("producto")
+  @@schema("inventario")
+}
+
+/// Producto más presentación, sin marca ni SKU: arroz Diana 500 g y arroz D1
+/// 500 g son la misma referencia (Arquitectura, glosario). El código del Banco
+/// lo hereda de la categoría de su producto.
+model Referencia {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoId            String   @map("banco_id") @db.Uuid
+  productoId         String   @map("producto_id") @db.Uuid
+  presentacion       String   @db.VarChar(100)
+  equivalenciaKg     Decimal  @map("equivalencia_kg") @db.Decimal(10, 3)
+  creadaDesdeCelular Boolean  @default(false) @map("creada_desde_celular")
+  activa             Boolean  @default(true)
+  creadoPor          String?  @map("creado_por") @db.VarChar(100)
+  actualizadoPor     String?  @map("actualizado_por") @db.VarChar(100)
+  creadoEn           DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  actualizadoEn      DateTime @default(now()) @updatedAt @map("actualizado_en") @db.Timestamptz
+
+  producto Producto @relation(fields: [bancoId, productoId], references: [bancoId, id])
+
+  @@unique([bancoId, productoId, presentacion])
+  @@map("referencia")
+  @@schema("inventario")
+}

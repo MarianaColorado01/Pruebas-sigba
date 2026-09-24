@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { executeTransactionWithTenant } from '../src/core/database/index.js';
+import { urlComoRolApp } from './rol-de-aplicacion.js';
 
 /**
  * Aislamiento entre bancos, contra PostgreSQL de verdad (RNF-01, ADR-07).
@@ -26,22 +27,7 @@ if (process.env['CI'] && !URL_ADMIN) {
 
 const hayBaseDeDatos = Boolean(URL_ADMIN);
 
-/**
- * Rol de aplicación sin privilegios de elusión. Arquitectura 8.1 exige que el
- * rol de ejecución no sea dueño de tablas, ni superusuario, ni BYPASSRLS.
- * Conectarse como superusuario haría pasar la prueba sin demostrar nada.
- */
 type FilaBodega = { banco_id: string; nombre: string };
-
-const ROL_APP = 'sigba_app_prueba';
-const CLAVE_APP = 'prueba_aislamiento';
-
-function urlComoRolApp(base: string): string {
-  const url = new URL(base);
-  url.username = ROL_APP;
-  url.password = CLAVE_APP;
-  return url.toString();
-}
 
 describe.skipIf(!hayBaseDeDatos)(
   'Aislamiento entre bancos contra PostgreSQL (RNF-01, ADR-07)',
@@ -56,22 +42,8 @@ describe.skipIf(!hayBaseDeDatos)(
     beforeAll(async () => {
       admin = new PrismaClient({ datasourceUrl: URL_ADMIN });
 
-      // Rol de aplicación: sin superusuario y sin BYPASSRLS.
-      await admin.$executeRawUnsafe(`
-      DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${ROL_APP}') THEN
-          CREATE ROLE ${ROL_APP} LOGIN PASSWORD '${CLAVE_APP}' NOSUPERUSER NOBYPASSRLS;
-        END IF;
-      END $$;
-    `);
-      // Una sentencia por llamada: Postgres no acepta varias en un statement
-      // preparado, que es lo que usa Prisma por debajo.
-      await admin.$executeRawUnsafe(
-        `GRANT USAGE ON SCHEMA core, plataforma, inventario, beneficiarios, analitica TO ${ROL_APP}`,
-      );
-      await admin.$executeRawUnsafe(
-        `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA plataforma TO ${ROL_APP}`,
-      );
+      // El rol de la aplicación, sin superusuario ni BYPASSRLS, lo crea
+      // test/rol-de-aplicacion.ts antes de que corra ningún archivo.
 
       // Datos de dos bancos, sembrados por el administrador para que existan
       // independientemente de lo que el rol de aplicación pueda o no ver.

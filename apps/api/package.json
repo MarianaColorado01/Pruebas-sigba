@@ -5,12 +5,12 @@
   "type": "module",
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build",
+    "build": "prisma generate && nest build",
     "dev": "nest start --watch",
     "start": "node dist/main",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "prisma generate && tsc --noEmit",
     "pretest": "prisma generate",
     "test": "vitest run --coverage && vitest run --config ./vitest.config.e2e.ts",
     "test:watch": "vitest",
@@ -46,5 +46,8 @@
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
     "vitest": "catalog:"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.ts"
   }
 }

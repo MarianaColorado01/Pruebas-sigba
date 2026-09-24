@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Prisma } from '@prisma/client';
@@ -24,10 +24,15 @@ const aqui = resolve(fileURLToPath(new URL('.', import.meta.url)));
 
 describe('Contrato del esquema y la migración (ADR-05, ADR-07)', () => {
   const schema = readFileSync(resolve(aqui, '../prisma/schema.prisma'), 'utf8');
-  const migracion = readFileSync(
-    resolve(aqui, '../prisma/migrations/20260917000000_init_plataforma_rls/migration.sql'),
-    'utf8',
-  );
+  const carpetaMigraciones = resolve(aqui, '../prisma/migrations');
+  // Todas juntas: una tabla nueva en una migración posterior también tiene que
+  // traer su RLS.
+  const migracion = readdirSync(carpetaMigraciones, { withFileTypes: true })
+    .filter((entrada) => entrada.isDirectory())
+    .map((entrada) =>
+      readFileSync(resolve(carpetaMigraciones, entrada.name, 'migration.sql'), 'utf8'),
+    )
+    .join('\n');
 
   it('declara los cinco schemas del monolito modular', () => {
     expect(schema).toContain(
@@ -37,7 +42,7 @@ describe('Contrato del esquema y la migración (ADR-05, ADR-07)', () => {
 
   it('ninguna tabla con banco_id queda sin ENABLE y FORCE ROW LEVEL SECURITY', () => {
     const conBancoId = [
-      ...migracion.matchAll(/CREATE TABLE IF NOT EXISTS "(\w+)"\."(\w+)"[^;]*?"banco_id"/gs),
+      ...migracion.matchAll(/CREATE TABLE (?:IF NOT EXISTS )?"(\w+)"\."(\w+)"[^;]*?"banco_id"/gs),
     ].map((m) => `"${m[1]}"."${m[2]}"`);
 
     expect(conBancoId.length).toBeGreaterThan(0);

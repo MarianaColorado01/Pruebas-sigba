@@ -5,6 +5,8 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['src/**/*.spec.ts', 'test/**/*.spec.ts'],
+    // Crea el rol sin privilegios de las pruebas de integración una sola vez.
+    globalSetup: ['./test/rol-de-aplicacion.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/*.e2e-spec.ts'],
     coverage: {
       provider: 'v8',
