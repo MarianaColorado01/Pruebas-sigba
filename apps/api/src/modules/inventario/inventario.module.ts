@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { DonantesPrismaRepositorio } from './repositories/donantes.prisma.repositorio.js';
+import { DonantesRepositorio } from './services/donante.js';
+import { DonantesService } from './services/donantes.service.js';
 
 /**
  * Inventario · Equipo 2
@@ -10,7 +13,10 @@ import { Module } from '@nestjs/common';
 @Module({
   imports: [],
   controllers: [],
-  providers: [],
+  providers: [
+    DonantesService,
+    { provide: DonantesRepositorio, useClass: DonantesPrismaRepositorio },
+  ],
   exports: [],
 })
 export class InventarioModule {}
