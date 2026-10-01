@@ -51,8 +51,9 @@ no es una mejora por sí mismo. Aplica el criterio de simplicidad de Ponytail.
   reintento como un registro nuevo (Arquitectura 6.1).
 - **Valoración.** Precio ausente resuelto con cero, con un precio vencido o bloqueando la
   recepción. La recepción confirma cantidades y marca valoración pendiente (ADR-13).
-- **Datos personales.** Documento sin cifrar, huella sin HMAC por banco, o carga con datos
-  personales en logs, trazas o eventos (Arquitectura 8.6, RNF-04).
+- **Datos personales.** Documento sin cifrar o sin HMAC por banco cuando ya hay datos reales
+  (SBA-31; con datos sintéticos puede ir en claro), o carga con datos personales en logs,
+  trazas o eventos (Arquitectura 8.6, RNF-04).
 
 ## Resultado
 

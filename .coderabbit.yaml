@@ -124,8 +124,9 @@ reviews:
     - path: 'apps/api/src/modules/beneficiarios/**'
       instructions: >-
         Datos personales de población vulnerable, incluidos menores. El documento
-        va cifrado y la unicidad se resuelve con huella HMAC por banco, sobre
-        `(banco, tipo, huella)` (anexo B).
+        va cifrado y con HMAC por banco antes del primer dato real (SBA-31);
+        mientras solo haya datos sintéticos puede ir en claro. La unicidad es por
+        banco y número, sin el tipo (ADR-15).
 
         Nada de datos personales en logs, trazas de Sentry ni cargas de evento
         (RNF-M3-08, 8.6). Revisa también los mensajes de error.

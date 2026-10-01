@@ -88,7 +88,8 @@ te va a dejar.
   (Arquitectura 6.1). El celular reenvía comandos; sin esta clave se duplica inventario.
 - Sin precio vigente aprobado, la recepción confirma cantidades y queda con valoración
   pendiente. Nunca cero, nunca un precio vencido, nunca bloquear la recepción (ADR-13).
-- Datos personales de beneficiarios: documento cifrado y huella HMAC por banco; nada en
+- Datos personales de beneficiarios: documento cifrado y con HMAC por banco antes del
+  primer dato real (SBA-31; mientras solo haya datos sintéticos puede ir en claro); nada en
   logs, trazas de Sentry, cargas de evento, mensajes de error ni IndexedDB sin cifrar
   (Arquitectura 8.6). El token de Auth0 vive en memoria, nunca en localStorage,
   sessionStorage ni IndexedDB (ADR-06).
