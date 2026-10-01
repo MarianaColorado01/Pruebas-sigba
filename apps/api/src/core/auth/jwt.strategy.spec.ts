@@ -1,18 +1,16 @@
 import { UnauthorizedException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service.js';
 import { describe, expect, it, vi } from 'vitest';
 import { JwtStrategy } from './jwt.strategy.js';
 
 describe('JwtStrategy', () => {
   it('resuelve el usuario y el banco desde auth0_sub', async () => {
-    const prisma = {
-      usuario: {
-        findUnique: vi.fn().mockResolvedValue({
+    const findUnique = vi.fn().mockResolvedValue({
           id: '1b0c8d3a-0000-4000-8000-000000000001',
           auth0_sub: 'auth0|user-123',
           banco_id: '2b0c8d3a-0000-4000-8000-000000000002',
-        }),
-      },
-    } as any;
+        });
+    const prisma = { usuario: { findUnique } } as unknown as PrismaService;
 
     const strategy = new JwtStrategy(prisma);
 
@@ -41,21 +39,22 @@ describe('JwtStrategy', () => {
   });
 
   it('rechaza un token sin sub válido', async () => {
-    const strategy = new JwtStrategy({ usuario: { findUnique: vi.fn() } } as any);
+    const findUnique = vi.fn();
+    const strategy = new JwtStrategy(
+      { usuario: { findUnique } } as unknown as PrismaService,
+    );
 
     await expect(
       strategy.validate({
         roles: ['consulta'],
       }),
     ).rejects.toThrow(UnauthorizedException);
+    expect(findUnique).not.toHaveBeenCalled();
   });
 
   it('rechaza un usuario no registrado en SIGBA', async () => {
-    const prisma = {
-      usuario: {
-        findUnique: vi.fn().mockResolvedValue(null),
-      },
-    } as any;
+    const findUnique = vi.fn().mockResolvedValue(null);
+    const prisma = { usuario: { findUnique } } as unknown as PrismaService;
 
     const strategy = new JwtStrategy(prisma);
 
