@@ -9,3 +9,11 @@
  */
 
 export { InventarioModule } from './inventario.module.js';
+
+// Lo usa el comando de consola `importar-codigos` (SBA-12), que corre fuera del
+// módulo. Ningún otro módulo lo necesita.
+export {
+  ArchivoDeCodigosInvalido,
+  ImportacionCatalogoService,
+} from './services/importacion-catalogo.service.js';
+export type { ReporteDeImportacion } from './services/importacion-catalogo.service.js';

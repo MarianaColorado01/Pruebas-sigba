@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import {
-  executeTransactionWithTenant,
-  getTenantContext,
-  PrismaService,
-} from '../../../core/index.js';
+import { executeTransactionWithTenant, PrismaService } from '../../../core/index.js';
+import { contexto } from './contexto-de-tenant.js';
 import {
   type BusquedaDeDonantes,
   type CambiosEnDonante,
@@ -65,13 +62,4 @@ export class DonantesPrismaRepositorio extends DonantesRepositorio {
       return tx.donante.findUniqueOrThrow({ where: { id }, select: COLUMNAS });
     });
   }
-}
-
-/** Banco y actor de la petición. Sin banco no hay a quién escribirle. */
-function contexto(): { bancoId: string; actor: string | null } {
-  const ctx = getTenantContext();
-  if (!ctx?.bancoId) {
-    throw new Error('Escritura en inventario sin banco en el contexto de tenant.');
-  }
-  return { bancoId: ctx.bancoId, actor: ctx.usuarioId ?? null };
 }

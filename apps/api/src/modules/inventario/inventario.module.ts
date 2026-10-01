@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
+import { CategoriasPrismaRepositorio } from './repositories/categorias.prisma.repositorio.js';
 import { DonantesPrismaRepositorio } from './repositories/donantes.prisma.repositorio.js';
+import { CategoriasRepositorio } from './services/categoria.js';
 import { DonantesRepositorio } from './services/donante.js';
 import { DonantesService } from './services/donantes.service.js';
+import { ImportacionCatalogoService } from './services/importacion-catalogo.service.js';
 
 /**
  * Inventario · Equipo 2
@@ -16,6 +19,8 @@ import { DonantesService } from './services/donantes.service.js';
   providers: [
     DonantesService,
     { provide: DonantesRepositorio, useClass: DonantesPrismaRepositorio },
+    ImportacionCatalogoService,
+    { provide: CategoriasRepositorio, useClass: CategoriasPrismaRepositorio },
   ],
   exports: [],
 })

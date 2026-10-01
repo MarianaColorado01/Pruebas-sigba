@@ -11,7 +11,13 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.spec.ts', 'src/**/index.ts', 'src/**/*.module.ts', 'src/main.ts'],
+      exclude: [
+        'src/**/*.spec.ts',
+        'src/**/index.ts',
+        'src/**/*.module.ts',
+        'src/main.ts',
+        'src/importar-codigos.ts',
+      ],
       reporter: ['text', 'lcov'],
       // RNF-02: la lógica de dominio se escribe con TDD, mínimo 70 % en services.
       thresholds: {

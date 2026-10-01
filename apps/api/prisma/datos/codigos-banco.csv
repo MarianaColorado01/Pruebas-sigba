@@ -1,0 +1,55 @@
+linea_codigo;linea;codigo;subcategoria;productos
+E0;Electrodomésticos;E001;Electrodomésticos;Pequeño aparato
+E0;Electrodomésticos;E002;Electrodomésticos;Gran aparato
+G1;Grasas;G101;Grasas tipo 1 (monoinsaturadas);Aceite de oliva - Margarina
+G1;Grasas;G102;Grasas tipo 1 (monoinsaturadas);Aguacate
+G1;Grasas;G103;Grasas tipo 2 (poliinsaturadas);Mayonesa - Aceite de girasol - Aceite de maíz - Aceite de soya
+G1;Grasas;G104;Grasas tipo 3 (saturadas);Coco - Crema de leche - Manteca - Mantequilla - Mezcla de aceites vegetales - Queso crema
+G1;Grasas;G105;Grasas tipo 3 (saturadas);Embutidos (chorizo, salchicha, longaniza) - Embutidos en conserva - Tocineta - Tocino
+AS2;Aseo;A201;Hogar;Blanqueadores - Crema dental - Detergentes - Suavizantes - Utensilios para aseo hogar
+AS2;Aseo;A202;Hogar;Bolsas - Gorros - Guantes - Papel higiénico
+AS2;Aseo;A203;Personal;Acondicionador - Crema corporal - Desodorantes - Jabón de cuerpo - Jabón para manos - Shampoo
+AS2;Aseo;A204;Personal;Algodón - Cepillos dentales - Copitos - Pañitos húmedos - Protectores - Toallas higiénicas
+AS2;Aseo;A205;Personal;Perfumería - Artículos de belleza
+B3;Bebidas;B301;Agua;Agua
+B3;Bebidas;B302;Bebidas azucaradas;Gaseosa - Jugos - Refrescos - Té líquido - Bebidas energizantes - Néctares - Bebidas soya - Agua aloe vera
+B3;Bebidas;B303;Bebidas alcohólicas;Cerveza - Vino
+B3;Bebidas;B304;Otras bebidas;Agua con gas - Agua saborizada
+CA4;Carnes, huevos, leguminosas secas, frutos secos y semillas;CA401;Carnes;Jamón - Atún - Pollo - Carne de res - Carne de cerdo - Animales de mar - Carne de ternera - Gallina - Morcilla - Pescados - Sardinas - Vísceras
+CA4;Carnes, huevos, leguminosas secas, frutos secos y semillas;CA402;Frutos secos y semillas;Maní - Ajonjolí - Almendras - Avellanas - Coco deshidratado - Habas - Macadamia - Marañón - Nueces - Pecanas - Pistachos - Semillas de chía
+CA4;Carnes, huevos, leguminosas secas, frutos secos y semillas;CA403;Huevos;Huevo de gallina - Huevo de codorniz - Claras de huevo - Yemas de huevo
+CA4;Carnes, huevos, leguminosas secas, frutos secos y semillas;CA404;Leguminosas secas y mezclas vegetales;Arveja seca - Fríjol - Lenteja - Garbanzo - Mezclas vegetales (Bienestarina, Solidarina, Colombiarina) - Proteína de soya texturizada - Proteína vegetal soya
+FV5;Frutas y verduras;FV501;Frutas;Granadilla - Manzana - Guayaba - Papaya - Piña - Naranja - Limón - Banano - Guanábana - Mango - Lulo - Mandarina - Maracuyá - Mora - Fresa - Anón - Arazá - Árbol del pan - Asaí - Babaco - Badea - Borojó - Breva - Cacao - Caimo - Carambolo - Cereza - Chamba - Chirimoya - Chontaduro - Chupas - Cidra - Ciruela - Ciruelo - Curuba - Dátil - Durazno - Feijoa - Granada - Guamo - Gulupa - Higo - Icaco - Kiwi - Lima - Madroño - Mamey - Mamoncillo - Mangostán - Marañón - Melón - Noni - Palmito - Papayuela - Pera - Piñuela - Pitahaya - Pomarrosa - Sandía - Tamarindo - Táparo - Tomate de árbol - Toronja - Uchuva - Uva - Zapote
+FV5;Frutas y verduras;FV502;Verduras;Tomate - Zanahoria - Cebolla todas las variedades - Brócoli - Pepino - Lechuga - Cilantro - Ajo - Remolacha - Ají - Apio - Arveja verde - Espinaca - Repollo - Tallos - Pimentón - Habichuela - Aceituna - Perejil - Coliflor - Acelga - Ahuyama o zapallo - Alcachofa - Alcaparras - Balú - Batata - Berenjena - Berro - Bore - Calabaza - Candia - Cardo - Champiñón - Chugua - Colinabo - Espárrago - Guascas - Guatila - Guisantes - Habas verdes - Ibia - Nabo - Palmito - Rábano - Repollitas - Ruibarbo
+L6;Lácteos;L601;Leche entera;Leche entera de vaca líquida - Leche entera de cabra
+L6;Lácteos;L602;Productos lácteos con reducción de grasa;Yogurt dietético - Kumis dietético - Leche en polvo baja en grasa - Leche líquida baja en grasa
+L6;Lácteos;L603;Productos lácteos grasa entera;Queso variedades - Yogurt - Kumis - Quesito - Bebidas lácteas con leche entera - Cuajada de leche de vaca - Suero
+L6;Lácteos;L604;Leche líquida;Leche entera de vaca polvo
+ONA7;Otros no alimentos;ONA701;Papelería;Papelería
+ONA7;Otros no alimentos;ONA702;Juguetes;Juguetes
+ONA7;Otros no alimentos;ONA703;Muebles;Muebles
+ONA7;Otros no alimentos;ONA704;Textiles;Textiles - Zapatos
+ONA7;Otros no alimentos;ONA705;Suplementos nutricionales;Suplementos nutricionales
+ONA7;Otros no alimentos;ONA706;Medicamentos sin fórmula médica;Medicamentos sin fórmula médica
+ONA7;Otros no alimentos;ONA707;Materiales de construcción;Materiales de construcción
+ONA7;Otros no alimentos;ONA708;Otros no alimentos;Otros no alimentos
+ONA7;Otros no alimentos;ONA709;Reciclaje;Reciclaje
+CE8;Cereales, raíces, tubérculos, plátanos y derivados;C801;Cereales;Arroz blanco - Arroz integral - Arroz sopero
+CE8;Cereales, raíces, tubérculos, plátanos y derivados;C802;Cereales;Arepa de maíz - Pasta - Almidón de maíz - Almojábana - Avena en hojuelas y polvo - Cuchuco de cebada - Fécula - Harina de arroz, maíz, trigo - Maíz pira - Maíz tierno o choclo - Quinua - Semolina - Tacos - Tortillas de harina - Cebada
+CE8;Cereales, raíces, tubérculos, plátanos y derivados;C803;Panadería;Panadería - Galletas en general - Brownie - Ponqué - Roscón - Torta
+CE8;Cereales, raíces, tubérculos, plátanos y derivados;C804;Plátanos;Plátano todas las variedades - Harina de plátano
+CE8;Cereales, raíces, tubérculos, plátanos y derivados;C805;Raíces;Yuca - Arracacha - Ñame
+CE8;Cereales, raíces, tubérculos, plátanos y derivados;C806;Tubérculos;Papa - Papa criolla - Batata - Chuguas - Cubios
+CE8;Cereales, raíces, tubérculos, plátanos y derivados;C807;Cereales;Cereal en aros - Cereal para el desayuno - Hojuelas de maíz
+AZ9;Azúcares;AZ901;Azúcares simples;Azúcar blanca - Azúcar morena - Panela - Miel de abejas
+AZ9;Azúcares;AZ902;Dulces y postres p;Chocolate con azúcar - Chocolatinas - Arequipe - Barras de cereal - Donas - Bocadillo - Cocada - Cocoa - Gelatina - Masmelos - Panelitas - Postre - Caramelos - Ciruelas pasas - Confites
+AZ9;Azúcares;AZ903;Dulces y postres g;Leche condensada - Mermeladas - Helados - Natilla - Brevas en almíbar - Cerezas en almíbar - Cóctel de frutas - Durazno enlatado - Jarabe de maple - Piña enlatada
+PS10;Paquetes/Snacks;PS1001;Paquetes/Snacks;Paquetes/Snacks
+OA11;Otros alimentos;OA1101;Otros alimentos;Café - Chocolate
+OA11;Otros alimentos;OA1102;Otros alimentos;Verduras enlatadas - Encurtidos - Salsas - Vinagre - Compotas - Leguminosas enlatadas
+OA11;Otros alimentos;OA1103;Otros alimentos;Sal - Aromáticas - Té en polvo - Canela - Especias - Jengibre
+OA11;Otros alimentos;OA1004;Otros alimentos;Sopas instantáneas - Crema no láctea - Mezclas listas - Modificadores de leche - Caldos en cubo - Refrescos en polvo
+FE12;Fórmulas especiales;FE1201;Fórmulas infantiles;Fórmulas infantiles para niños y niñas de 0 a 6 meses - Fórmulas infantiles para niños y niñas de 7 a 12 meses - Fórmulas infantiles para niños y niñas de 13 a 24 meses
+FE12;Fórmulas especiales;FE1202;Otras fórmulas;Complementos nutricionales para adultos - Complementos nutricionales para mujeres gestantes y madres en periodo de lactancia - Fórmulas infantiles para niños y niñas mayores de 2 años - Otros complementos nutricionales
+ARP13;Alimentos recién preparados;ARP1301;Alimentos recién preparados;Alimentos recién preparados
+APM14;Alimentos para mascotas;APM1401;Alimentos para mascotas;Alimentos para mascotas
