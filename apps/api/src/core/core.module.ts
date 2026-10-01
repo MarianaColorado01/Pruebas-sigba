@@ -1,4 +1,8 @@
 import { Global, Module } from '@nestjs/common';
+import { PassportModule } from '@nestjs/passport';
+import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
+import { JwtStrategy } from './auth/jwt.strategy.js';
+import { PrismaModule } from './prisma/prisma.module.js';
 
 /**
  * Infraestructura compartida por todos los módulos: conexión a base de datos,
@@ -8,16 +12,11 @@ import { Global, Module } from '@nestjs/common';
  *
  * `core` no es un cuarto módulo de alcance: los módulos dependen de él, nunca
  * al revés. El lint lo comprueba (ADR-01).
- *
- * Está vacío a propósito. Se llena en:
- *   SBA-6  · contexto de tenant y RLS por banco
- *   SBA-8  · adaptador OIDC de Auth0
- *   SBA-21 · auditoría base
- *   SBA-30 · outbox transaccional
  */
 @Global()
 @Module({
-  providers: [],
-  exports: [],
+  imports: [PassportModule, PrismaModule],
+  providers: [JwtStrategy, JwtAuthGuard],
+  exports: [PassportModule, JwtAuthGuard, PrismaModule],
 })
 export class CoreModule {}

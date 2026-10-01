@@ -1,0 +1,27 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["core", "plataforma", "inventario", "beneficiarios", "analitica"]
+}
+
+model Usuario {
+  id          String   @id @default(uuid()) @db.Uuid
+  auth0_sub   String   @unique
+  correo      String   @unique
+  banco_id    String   @db.Uuid
+  
+  // Campos de auditoría requeridos por la arquitectura
+  creado_por  String?  @db.Uuid
+  creado_en   DateTime @default(now())
+  actualizado_en DateTime @updatedAt
+  
+  // Relación con UsuarioRol (deberás crear el modelo UsuarioRol más adelante)
+  // usuario_rol UsuarioRol[]
+
+  @@schema("plataforma")
+}

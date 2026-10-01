@@ -18,13 +18,20 @@ export class ErrorDeApi extends Error {
   }
 }
 
-export async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
+export async function pedir<T>(ruta: string, opciones: RequestInit = {}, accessToken?: string): Promise<T> {
+  const cabeceras = new Headers(opciones.headers ?? {});
+
+  if (accessToken) {
+    cabeceras.set('Authorization', `Bearer ${accessToken}`);
+  }
+
+  if (!cabeceras.has('content-type') && !(opciones.body instanceof FormData)) {
+    cabeceras.set('content-type', 'application/json');
+  }
+
   const respuesta = await fetch(`${BASE}${ruta}`, {
     ...opciones,
-    headers: {
-      'content-type': 'application/json',
-      ...opciones.headers,
-    },
+    headers: cabeceras,
   });
 
   if (!respuesta.ok) {

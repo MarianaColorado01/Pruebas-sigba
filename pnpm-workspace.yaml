@@ -2,6 +2,14 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+allowBuilds:
+  '@prisma/engines': set this to true or false
+  browser-tabs-lock: true
+  esbuild: true
+  msgpackr-extract: true
+  prisma: set this to true or false
+  workerd: true
+
 # Un solo lugar donde se fijan las versiones compartidas.
 # «Fijar versiones compatibles en el lockfile de la Iteración 0» (Arquitectura 5.1).
 # Los paquetes las referencian con "catalog:" en vez de repetir el número.

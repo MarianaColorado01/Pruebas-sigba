@@ -15,6 +15,7 @@
     "test:cov": "vitest run --coverage"
   },
   "dependencies": {
+    "@auth0/auth0-react": "^2.25.0",
     "@sigba/shared-types": "workspace:*",
     "@sigba/ui": "workspace:*",
     "@tanstack/react-query": "^5.103.0",
