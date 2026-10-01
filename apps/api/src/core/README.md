@@ -14,6 +14,7 @@ importa un módulo. El lint lo comprueba y falla si se invierte (ADR-01).
 | --------------------------------------------------------------- | -------------- |
 | Contexto de tenant (`AsyncLocalStorage`) y RLS por banco        | SBA-6          |
 | Guard de JWT y adaptador OIDC de Auth0                          | SBA-8          |
+| Roles por banco, `@Roles()` y contexto de petición              | SBA-18         |
 | `AuditService` y auditoría base                                 | SBA-21         |
 | `EventPublisher` y outbox transaccional                         | SBA-30         |
 | Puertos de proveedores: almacenamiento, correo, visión, precios | SBA-13, SBA-54 |

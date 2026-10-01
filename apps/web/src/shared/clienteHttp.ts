@@ -19,13 +19,12 @@ export class ErrorDeApi extends Error {
 }
 
 export async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
-  const respuesta = await fetch(`${BASE}${ruta}`, {
-    ...opciones,
-    headers: {
-      'content-type': 'application/json',
-      ...opciones.headers,
-    },
-  });
+  // Con spread, un `Headers` llega vacío y un arreglo de pares llega como una
+  // cabecera «0»; `new Headers()` lee las tres formas de `HeadersInit`.
+  const headers = new Headers(opciones.headers);
+  if (!headers.has('content-type')) headers.set('content-type', 'application/json');
+
+  const respuesta = await fetch(`${BASE}${ruta}`, { ...opciones, headers });
 
   if (!respuesta.ok) {
     throw new ErrorDeApi(respuesta.status, `La API respondió ${respuesta.status}`);

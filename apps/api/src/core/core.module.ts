@@ -12,14 +12,16 @@ import { Global, Module } from '@nestjs/common';
  * Está vacío a propósito. Se llena en:
  *   SBA-6  · contexto de tenant y RLS por banco
  *   SBA-8  · adaptador OIDC de Auth0
+ *   SBA-18 · roles por banco y guard de roles
  *   SBA-21 · auditoría base
  *   SBA-30 · outbox transaccional
  */
+import { AsignacionesDeUsuario } from './autorizacion/asignaciones-de-usuario.js';
 import { PrismaService } from './database/prisma.service.js';
 
 @Global()
 @Module({
-  providers: [PrismaService],
-  exports: [PrismaService],
+  providers: [PrismaService, AsignacionesDeUsuario],
+  exports: [PrismaService, AsignacionesDeUsuario],
 })
 export class CoreModule {}

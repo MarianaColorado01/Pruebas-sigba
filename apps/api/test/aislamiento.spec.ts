@@ -110,22 +110,26 @@ describe('La transacción fija el contexto sin concatenar SQL', () => {
     const { cliente, llamadas } = clienteFalso();
     const banco = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
     const institucion = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+    const usuario = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
     await executeTransactionWithTenant(cliente, async () => 'listo', {
       bancoId: banco,
       institucionId: institucion,
+      usuarioId: usuario,
     });
 
-    expect(llamadas).toHaveLength(2);
+    expect(llamadas).toHaveLength(3);
     for (const llamada of llamadas) {
       expect(llamada.sql).toContain('set_config');
       // El valor viaja como parámetro: nunca aparece incrustado en el texto.
       expect(llamada.sql).not.toContain(banco);
       expect(llamada.sql).not.toContain(institucion);
+      expect(llamada.sql).not.toContain(usuario);
     }
 
     expect(llamadas[0]?.valores).toEqual(['app.banco_id', banco]);
     expect(llamadas[1]?.valores).toEqual(['app.institucion_id', institucion]);
+    expect(llamadas[2]?.valores).toEqual(['app.usuario_id', usuario]);
   });
 
   it('sin contexto envía cadena vacía, que las políticas rechazan', async () => {
@@ -135,6 +139,7 @@ describe('La transacción fija el contexto sin concatenar SQL', () => {
 
     expect(llamadas[0]?.valores).toEqual(['app.banco_id', '']);
     expect(llamadas[1]?.valores).toEqual(['app.institucion_id', '']);
+    expect(llamadas[2]?.valores).toEqual(['app.usuario_id', '']);
   });
 
   it('un identificador con comillas no se convierte en SQL', async () => {

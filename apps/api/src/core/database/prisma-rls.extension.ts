@@ -15,6 +15,8 @@ import { getTenantContext, type TenantContext } from './tenant-context.js';
 /** Claves de sesión que leen las políticas RLS. */
 const CLAVE_BANCO = 'app.banco_id';
 const CLAVE_INSTITUCION = 'app.institucion_id';
+/** Solo la lee la política que deja a cada usuario ver sus asignaciones (SBA-18). */
+const CLAVE_USUARIO = 'app.usuario_id';
 
 /**
  * Fija el contexto dentro de la transacción. Sin contexto escribe cadena vacía,
@@ -23,6 +25,7 @@ const CLAVE_INSTITUCION = 'app.institucion_id';
 async function fijarContexto(tx: Prisma.TransactionClient, ctx?: TenantContext): Promise<void> {
   await tx.$executeRaw`SELECT set_config(${CLAVE_BANCO}, ${ctx?.bancoId ?? ''}, true)`;
   await tx.$executeRaw`SELECT set_config(${CLAVE_INSTITUCION}, ${ctx?.institucionId ?? ''}, true)`;
+  await tx.$executeRaw`SELECT set_config(${CLAVE_USUARIO}, ${ctx?.usuarioId ?? ''}, true)`;
 }
 
 export async function executeTransactionWithTenant<R>(
