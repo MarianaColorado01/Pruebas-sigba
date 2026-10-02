@@ -3,11 +3,11 @@ packages:
   - 'packages/*'
 
 allowBuilds:
-  '@prisma/engines': set this to true or false
+  '@prisma/engines': true
   browser-tabs-lock: true
   esbuild: true
   msgpackr-extract: true
-  prisma: set this to true or false
+  prisma: true
   workerd: true
 
 # Un solo lugar donde se fijan las versiones compartidas.

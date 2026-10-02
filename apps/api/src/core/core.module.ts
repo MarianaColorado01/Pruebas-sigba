@@ -15,7 +15,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
  */
 @Global()
 @Module({
-  imports: [PassportModule, PrismaModule],
+  imports: [PassportModule.register({ defaultStrategy: 'jwt' }), PrismaModule],
   providers: [JwtStrategy, JwtAuthGuard],
   exports: [PassportModule, JwtAuthGuard, PrismaModule],
 })
