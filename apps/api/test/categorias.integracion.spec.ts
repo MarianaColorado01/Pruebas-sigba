@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { AuditService } from '../src/core/index.js';
 import { type PrismaService, runWithTenantContext } from '../src/core/database/index.js';
 import { CategoriasPrismaRepositorio } from '../src/modules/inventario/repositories/categorias.prisma.repositorio.js';
 import { ImportacionCatalogoService } from '../src/modules/inventario/services/importacion-catalogo.service.js';
@@ -51,7 +52,7 @@ describe.skipIf(!URL_ADMIN)('Importación de códigos del Banco contra PostgreSQ
     app = new PrismaClient({ datasourceUrl: urlComoRolApp(URL_ADMIN as string) });
     // PrismaService es un PrismaClient; aquí va uno conectado con el rol de la app.
     servicio = new ImportacionCatalogoService(
-      new CategoriasPrismaRepositorio(app as PrismaService),
+      new CategoriasPrismaRepositorio(app as PrismaService, new AuditService()),
     );
   });
 
@@ -85,6 +86,28 @@ describe.skipIf(!URL_ADMIN)('Importación de códigos del Banco contra PostgreSQ
       descripcion: 'Arroz blanco - Arroz integral - Arroz sopero',
       creado_por: 'importar-codigos',
     });
+    const [categoria] = await admin.$queryRaw<{ id: string }[]>`
+      SELECT id::text FROM inventario.categoria
+      WHERE banco_id = ${bancoA}::uuid AND codigo = 'C801'`;
+    const [auditoria] = await admin.$queryRaw<
+      {
+        banco_id: string;
+        actor_tipo: string;
+        actor_etiqueta: string;
+        accion: string;
+        entidad: string;
+        entidad_id: string;
+      }[]
+    >`SELECT banco_id::text, actor_tipo, actor_etiqueta, accion, entidad, entidad_id
+      FROM core.auditoria WHERE entidad = 'categoria' AND entidad_id = ${categoria?.id}
+      ORDER BY ocurrido_en DESC LIMIT 1`;
+    expect(auditoria).toMatchObject({
+      banco_id: bancoA,
+      actor_tipo: 'sistema',
+      actor_etiqueta: 'importar-codigos',
+      accion: 'crear',
+      entidad: 'categoria',
+    });
   });
 
   it('correrla dos veces no duplica: la segunda deja las 54 sin cambios', async () => {
@@ -104,10 +127,30 @@ describe.skipIf(!URL_ADMIN)('Importación de códigos del Banco contra PostgreSQ
     );
 
     expect(reporte).toMatchObject({ creadas: 0, actualizadas: 1, sinCambios: 0 });
-    const [agua] = await admin.$queryRaw<{ nombre: string; linea: string }[]>`
-      SELECT nombre, linea FROM inventario.categoria
+    const [agua] = await admin.$queryRaw<{ id: string; nombre: string; linea: string }[]>`
+      SELECT id::text, nombre, linea FROM inventario.categoria
       WHERE banco_id = ${bancoA}::uuid AND codigo = 'B301'`;
-    expect(agua).toEqual({ nombre: 'Agua potable', linea: 'Bebidas' });
+    expect(agua).toMatchObject({ nombre: 'Agua potable', linea: 'Bebidas' });
+    const [auditoria] = await admin.$queryRaw<
+      {
+        banco_id: string;
+        actor_tipo: string;
+        actor_etiqueta: string;
+        accion: string;
+        entidad: string;
+        entidad_id: string;
+      }[]
+    >`SELECT banco_id::text, actor_tipo, actor_etiqueta, accion, entidad, entidad_id
+      FROM core.auditoria
+      WHERE entidad_id = ${agua?.id} AND accion = 'actualizar'`;
+    expect(auditoria).toEqual({
+      banco_id: bancoA,
+      actor_tipo: 'sistema',
+      actor_etiqueta: 'importar-codigos',
+      accion: 'actualizar',
+      entidad: 'categoria',
+      entidad_id: agua?.id,
+    });
   });
 
   it('un archivo sin las columnas de línea y productos no borra lo que ya había', async () => {
@@ -158,7 +201,7 @@ describe.skipIf(!URL_ADMIN)('Importación de códigos del Banco contra PostgreSQ
     // El comando usa DATABASE_URL, y en local ese usuario es superusuario, como
     // el administrador de esta prueba: ahí no hay RLS que filtre.
     const sinRls = new ImportacionCatalogoService(
-      new CategoriasPrismaRepositorio(admin as PrismaService),
+      new CategoriasPrismaRepositorio(admin as PrismaService, new AuditService()),
     );
     await enBanco(bancoA, () => servicio.importar(HOJA_DEL_BANCO));
 

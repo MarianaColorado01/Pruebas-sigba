@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { AuditService } from '../src/core/index.js';
 import { type PrismaService, runWithTenantContext } from '../src/core/database/index.js';
 import { ReferenciasPrismaRepositorio } from '../src/modules/inventario/repositories/referencias.prisma.repositorio.js';
 import { ReferenciasService } from '../src/modules/inventario/services/referencias.service.js';
@@ -34,6 +35,7 @@ describe.skipIf(!URL_ADMIN)('Catálogo contra PostgreSQL (SBA-22)', () => {
   let admin: PrismaClient;
   let app: PrismaClient;
   let servicio: ReferenciasService;
+  let repositorio: ReferenciasPrismaRepositorio;
 
   const bancoA = 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa';
   const bancoB = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
@@ -49,6 +51,22 @@ describe.skipIf(!URL_ADMIN)('Catálogo contra PostgreSQL (SBA-22)', () => {
         `DELETE FROM inventario.${tabla} WHERE banco_id IN ('${bancoA}', '${bancoB}')`,
       );
     }
+  }
+
+  async function auditoriaDe(entidadId: string) {
+    return admin.$queryRaw<
+      {
+        banco_id: string;
+        actor_tipo: string;
+        actor_id: string | null;
+        actor_etiqueta: string | null;
+        accion: string;
+        entidad: string;
+        entidad_id: string;
+      }[]
+    >`SELECT banco_id::text, actor_tipo, actor_id::text, actor_etiqueta, accion, entidad, entidad_id
+      FROM core.auditoria
+      WHERE entidad_id = ${entidadId}`;
   }
 
   /** Arroz en tres presentaciones bajo C801 y frijol bajo C802, en el banco A. */
@@ -140,7 +158,8 @@ describe.skipIf(!URL_ADMIN)('Catálogo contra PostgreSQL (SBA-22)', () => {
     admin = new PrismaClient({ datasourceUrl: URL_ADMIN });
     app = new PrismaClient({ datasourceUrl: urlComoRolApp(URL_ADMIN as string) });
     // PrismaService es un PrismaClient; aquí va uno conectado con el rol de la app.
-    servicio = new ReferenciasService(new ReferenciasPrismaRepositorio(app as PrismaService));
+    repositorio = new ReferenciasPrismaRepositorio(app as PrismaService, new AuditService());
+    servicio = new ReferenciasService(repositorio);
   });
 
   beforeEach(limpiar);
@@ -154,7 +173,40 @@ describe.skipIf(!URL_ADMIN)('Catálogo contra PostgreSQL (SBA-22)', () => {
   });
 
   it('entre miles de referencias, «arr» encuentra arroz 500 g, 1 kg y arroba, de menor a mayor, en menos de 300 ms', async () => {
-    await catalogoDePrueba();
+    const creados = await catalogoDePrueba();
+    await expect(auditoriaDe(creados.cereales.id)).resolves.toEqual([
+      {
+        banco_id: bancoA,
+        actor_tipo: 'sistema',
+        actor_id: null,
+        actor_etiqueta: 'coordinacion-prueba',
+        accion: 'crear',
+        entidad: 'categoria',
+        entidad_id: creados.cereales.id,
+      },
+    ]);
+    await expect(auditoriaDe(creados.arroz.id)).resolves.toEqual([
+      {
+        banco_id: bancoA,
+        actor_tipo: 'sistema',
+        actor_id: null,
+        actor_etiqueta: 'coordinacion-prueba',
+        accion: 'crear',
+        entidad: 'producto',
+        entidad_id: creados.arroz.id,
+      },
+    ]);
+    await expect(auditoriaDe(creados.medio.id)).resolves.toEqual([
+      {
+        banco_id: bancoA,
+        actor_tipo: 'sistema',
+        actor_id: null,
+        actor_etiqueta: 'coordinacion-prueba',
+        accion: 'crear',
+        entidad: 'referencia',
+        entidad_id: creados.medio.id,
+      },
+    ]);
     expect(await llenarCatalogo()).toBe(4324); // las 4.320 del volumen y las 4 de catalogoDePrueba
     await enBanco(bancoA, () => servicio.buscar({ texto: 'a' })); // conexión ya abierta
 
@@ -172,6 +224,38 @@ describe.skipIf(!URL_ADMIN)('Catálogo contra PostgreSQL (SBA-22)', () => {
       categoria: { codigo: 'C801', linea: 'Cereales' },
     });
     expect(milisegundos).toBeLessThan(300);
+  });
+
+  it('audita la actualización de cada fila de categoría, producto y referencia', async () => {
+    const creados = await catalogoDePrueba();
+    await enBanco(bancoA, async () => {
+      await repositorio.actualizarCategoria(creados.cereales.id, {
+        linea: 'Cereales actualizados',
+      });
+      await repositorio.actualizarProducto(creados.arroz.id, { nombre: 'Arroz actualizado' });
+      await repositorio.actualizarReferencia(creados.medio.id, {
+        presentacion: '500 g actualizado',
+      });
+    });
+
+    for (const [id, entidad] of [
+      [creados.cereales.id, 'categoria'],
+      [creados.arroz.id, 'producto'],
+      [creados.medio.id, 'referencia'],
+    ] as const) {
+      const registros = await auditoriaDe(id);
+      expect(registros).toEqual([
+        {
+          banco_id: bancoA,
+          actor_tipo: 'sistema',
+          actor_id: null,
+          actor_etiqueta: 'coordinacion-prueba',
+          accion: 'actualizar',
+          entidad,
+          entidad_id: id,
+        },
+      ]);
+    }
   });
 
   it('el código del Banco devuelve las referencias de ese código y de ningún otro', async () => {

@@ -12,7 +12,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private _extendedClient?: ExtendedPrismaClient;
 
   constructor() {
-    super();
+    super({ datasourceUrl: process.env['API_DATABASE_URL'] ?? process.env['DATABASE_URL'] });
   }
 
   async onModuleInit(): Promise<void> {

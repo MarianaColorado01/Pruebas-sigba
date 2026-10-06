@@ -1,0 +1,19 @@
+name: Neon preview cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  delete-preview:
+    name: delete preview branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Borrar solo la rama del PR cerrado
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: preview/pr-${{ github.event.number }}

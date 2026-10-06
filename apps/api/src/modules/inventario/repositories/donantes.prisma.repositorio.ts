@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { executeTransactionWithTenant, PrismaService } from '../../../core/index.js';
+import { AuditService, executeTransactionWithTenant, PrismaService } from '../../../core/index.js';
 import { contexto } from './contexto-de-tenant.js';
 import {
   type BusquedaDeDonantes,
@@ -18,19 +18,28 @@ const COLUMNAS = { id: true, nombre: true, tipo: true, contacto: true, activo: t
  */
 @Injectable()
 export class DonantesPrismaRepositorio extends DonantesRepositorio {
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditoria: AuditService,
+  ) {
     super();
   }
 
   async crear(datos: DatosDeDonante): Promise<Donante> {
     const { bancoId, actor } = contexto();
 
-    return executeTransactionWithTenant<Donante>(this.prisma, (tx) =>
-      tx.donante.create({
+    return executeTransactionWithTenant<Donante>(this.prisma, async (tx) => {
+      const donante = await tx.donante.create({
         data: { ...datos, bancoId, creadoPor: actor, actualizadoPor: actor },
         select: COLUMNAS,
-      }),
-    );
+      });
+      await this.auditoria.registrar(tx, {
+        accion: 'crear',
+        entidad: 'donante',
+        entidadId: donante.id,
+      });
+      return donante;
+    });
   }
 
   async buscar({ texto, tipo, soloActivos, limite }: BusquedaDeDonantes): Promise<Donante[]> {
@@ -59,7 +68,13 @@ export class DonantesPrismaRepositorio extends DonantesRepositorio {
         data: { ...cambios, actualizadoPor: actor },
       });
       if (count === 0) return null;
-      return tx.donante.findUniqueOrThrow({ where: { id }, select: COLUMNAS });
+      const donante = await tx.donante.findUniqueOrThrow({ where: { id }, select: COLUMNAS });
+      await this.auditoria.registrar(tx, {
+        accion: 'actualizar',
+        entidad: 'donante',
+        entidadId: donante.id,
+      });
+      return donante;
     });
   }
 }

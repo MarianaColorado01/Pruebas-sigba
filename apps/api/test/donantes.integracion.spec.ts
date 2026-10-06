@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { AuditService } from '../src/core/index.js';
 import { type PrismaService, runWithTenantContext } from '../src/core/database/index.js';
 import { DonantesPrismaRepositorio } from '../src/modules/inventario/repositories/donantes.prisma.repositorio.js';
 import { urlComoRolApp } from './rol-de-aplicacion.js';
@@ -44,7 +45,7 @@ describe.skipIf(!URL_ADMIN)('Directorio de donantes contra PostgreSQL (SBA-25)',
 
     app = new PrismaClient({ datasourceUrl: urlComoRolApp(URL_ADMIN as string) });
     // PrismaService es un PrismaClient; aquí va uno conectado con el rol de la app.
-    repositorio = new DonantesPrismaRepositorio(app as PrismaService);
+    repositorio = new DonantesPrismaRepositorio(app as PrismaService, new AuditService());
   });
 
   beforeEach(limpiar);
@@ -80,6 +81,23 @@ describe.skipIf(!URL_ADMIN)('Directorio de donantes contra PostgreSQL (SBA-25)',
     const [fila] = await admin.$queryRaw<{ banco_id: string; creado_por: string }[]>`
       SELECT banco_id::text, creado_por FROM inventario.donante WHERE id = ${donante.id}::uuid`;
     expect(fila).toEqual({ banco_id: bancoA, creado_por: 'operario-prueba' });
+    const [auditoria] = await admin.$queryRaw<
+      {
+        banco_id: string;
+        actor_etiqueta: string;
+        accion: string;
+        entidad: string;
+        entidad_id: string;
+      }[]
+    >`SELECT banco_id::text, actor_etiqueta, accion, entidad, entidad_id
+      FROM core.auditoria WHERE entidad_id = ${donante.id} ORDER BY ocurrido_en DESC LIMIT 1`;
+    expect(auditoria).toEqual({
+      banco_id: bancoA,
+      actor_etiqueta: 'operario-prueba',
+      accion: 'crear',
+      entidad: 'donante',
+      entidad_id: donante.id,
+    });
   });
 
   it('con parroquia solo devuelve parroquias', async () => {
@@ -158,6 +176,10 @@ describe.skipIf(!URL_ADMIN)('Directorio de donantes contra PostgreSQL (SBA-25)',
       tipo: 'particular',
       contacto: 'juan@ejemplo.test',
     });
+    const [auditoria] = await admin.$queryRaw<{ accion: string; entidad_id: string }[]>`
+      SELECT accion, entidad_id FROM core.auditoria
+      WHERE entidad_id = ${id} AND accion = 'actualizar'`;
+    expect(auditoria).toEqual({ accion: 'actualizar', entidad_id: id });
   });
 
   it('el banco B no ve ni puede editar los donantes del banco A', async () => {

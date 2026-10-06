@@ -12,3 +12,5 @@
 export { CoreModule } from './core.module.js';
 export * from './autorizacion/index.js';
 export * from './database/index.js';
+export * from './auditoria/audit.service.js';
+export * from './auditoria/auditoria.interceptor.js';

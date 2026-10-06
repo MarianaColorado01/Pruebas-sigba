@@ -17,11 +17,13 @@ import { Global, Module } from '@nestjs/common';
  *   SBA-30 · outbox transaccional
  */
 import { AsignacionesDeUsuario } from './autorizacion/asignaciones-de-usuario.js';
+import { AuditService } from './auditoria/audit.service.js';
+import { AuditoriaInterceptor } from './auditoria/auditoria.interceptor.js';
 import { PrismaService } from './database/prisma.service.js';
 
 @Global()
 @Module({
-  providers: [PrismaService, AsignacionesDeUsuario],
-  exports: [PrismaService, AsignacionesDeUsuario],
+  providers: [PrismaService, AsignacionesDeUsuario, AuditService, AuditoriaInterceptor],
+  exports: [PrismaService, AsignacionesDeUsuario, AuditService, AuditoriaInterceptor],
 })
 export class CoreModule {}

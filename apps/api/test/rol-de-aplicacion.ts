@@ -44,6 +44,13 @@ export default async function prepararRolDeAplicacion(): Promise<void> {
         `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ${schema} TO ${ROL_APP}`,
       );
     }
+    await admin.$executeRawUnsafe(
+      `REVOKE INSERT, UPDATE, DELETE ON core.auditoria FROM ${ROL_APP}`,
+    );
+    await admin.$executeRawUnsafe(`GRANT SELECT ON core.auditoria TO ${ROL_APP}`);
+    await admin.$executeRawUnsafe(
+      `GRANT EXECUTE ON FUNCTION core.registrar_auditoria(text, text, text, text, jsonb) TO ${ROL_APP}`,
+    );
   } finally {
     await admin.$disconnect();
   }

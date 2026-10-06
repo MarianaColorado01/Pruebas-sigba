@@ -108,6 +108,95 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Crear o reutilizar la rama Neon del PR
+        if: github.event_name == 'pull_request'
+        id: neon
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: preview/pr-${{ github.event.number }}
+          parent_branch: staging
+          role: neondb_owner
+          database: neondb
+          prisma: true
+      - name: Validar y configurar la conexión de preview
+        if: github.event_name == 'pull_request'
+        env:
+          BRANCH_NAME: preview/pr-${{ github.event.number }}
+          EXPECTED_BRANCH_NAME: preview/pr-${{ github.event.number }}
+          BRANCH_HOST: ${{ steps.neon.outputs.db_host }}
+          BRANCH_URL: ${{ steps.neon.outputs.db_url }}
+          BRANCH_ID: ${{ steps.neon.outputs.branch_id }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ "$BRANCH_NAME" != "$EXPECTED_BRANCH_NAME" || "$BRANCH_NAME" =~ (staging|production|prod) ]]; then
+            echo "::error::La rama Neon no es una rama de preview permitida."
+            exit 1
+          fi
+          if [[ -z "$BRANCH_URL" || -z "$BRANCH_HOST" ]]; then
+            echo "::error::Neon no devolvió la URL y el host de la rama."
+            exit 1
+          fi
+          node --input-type=module -e '
+            const url = new URL(process.env.BRANCH_URL);
+            const host = process.env.BRANCH_HOST;
+            if (url.hostname !== host || /staging|production|prod/i.test(url.href)) {
+              console.error("La conexión de Neon no corresponde a una URL de preview.");
+              process.exit(1);
+            }
+            if (decodeURIComponent(url.username) !== "neondb_owner") {
+              console.error("La migración requiere el rol dueño de Neon.");
+              process.exit(1);
+            }
+            const api = `https://console.neon.tech/api/v2/projects/${encodeURIComponent(process.env.NEON_PROJECT_ID)}/branches/${encodeURIComponent(process.env.BRANCH_ID)}`;
+            const response = await fetch(api, {
+              headers: { Authorization: `Bearer ${process.env.NEON_API_KEY}` },
+            });
+            if (!response.ok) {
+              console.error("No se pudo verificar la rama y su padre en Neon.");
+              process.exit(1);
+            }
+            const { branch } = await response.json();
+            if (branch.name !== process.env.EXPECTED_BRANCH_NAME || !branch.parent_id) {
+              console.error("La rama Neon no coincide con el nombre de preview esperado.");
+              process.exit(1);
+            }
+            const parentResponse = await fetch(`${api.slice(0, api.lastIndexOf("/"))}/${encodeURIComponent(branch.parent_id)}`, {
+              headers: { Authorization: `Bearer ${process.env.NEON_API_KEY}` },
+            });
+            if (!parentResponse.ok) {
+              console.error("No se pudo verificar la rama padre de Neon.");
+              process.exit(1);
+            }
+            const { branch: parent } = await parentResponse.json();
+            if (parent.name !== "staging") {
+              console.error("La rama de preview no tiene staging como padre.");
+              process.exit(1);
+            }
+            const endpointsResponse = await fetch(`${api}/endpoints`, {
+              headers: { Authorization: `Bearer ${process.env.NEON_API_KEY}` },
+            });
+            if (!endpointsResponse.ok) {
+              console.error("No se pudo verificar el host del endpoint Neon.");
+              process.exit(1);
+            }
+            const { endpoints } = await endpointsResponse.json();
+            if (!endpoints.some((endpoint) => endpoint.host === host)) {
+              console.error("La URL no corresponde a un endpoint de la rama Neon de preview.");
+              process.exit(1);
+            }
+            const appUrl = new URL(url);
+            appUrl.username = "sigba_app_prueba";
+            appUrl.password = "prueba_aislamiento";
+            const fs = await import("node:fs/promises");
+            await fs.appendFile(process.env.GITHUB_ENV, `DATABASE_URL=${url.href}\nAPI_DATABASE_URL=${appUrl.href}\n`);
+            await fs.appendFile(process.env.GITHUB_STEP_SUMMARY, "La rama Neon de preview pasó la guardia de conexión.\n");
+            console.log(`::add-mask::${url.href}`);
+            console.log(`::add-mask::${appUrl.href}`);
+          '
       - name: migraciones
         run: pnpm --filter @sigba/api exec prisma migrate deploy
       - run: pnpm run test
