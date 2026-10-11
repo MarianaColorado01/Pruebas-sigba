@@ -1,4 +1,8 @@
 import { Module } from '@nestjs/common';
+import { InstitucionesController } from './controllers/instituciones.controller.js';
+import { InstitucionesPrismaRepositorio } from './repositories/instituciones.prisma.repositorio.js';
+import { DirectorioDeInstitucionesService } from './services/directorio-de-instituciones.service.js';
+import { InstitucionesRepositorio } from './services/institucion.js';
 
 /**
  * Beneficiarios · Equipo 1
@@ -9,8 +13,11 @@ import { Module } from '@nestjs/common';
  */
 @Module({
   imports: [],
-  controllers: [],
-  providers: [],
+  controllers: [InstitucionesController],
+  providers: [
+    DirectorioDeInstitucionesService,
+    { provide: InstitucionesRepositorio, useClass: InstitucionesPrismaRepositorio },
+  ],
   exports: [],
 })
 export class BeneficiariosModule {}

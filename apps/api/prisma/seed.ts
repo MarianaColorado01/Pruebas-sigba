@@ -2,7 +2,10 @@
  * Semilla de desarrollo: un banco sintético con los códigos del Banco que
  * corresponden a las cinco agrupaciones del glosario (granos, dulces, aseo,
  * fruta y verdura, panadería), más el arroz con tres presentaciones (SBA-11).
- * La hoja completa, 54 códigos, la carga la importación de SBA-12.
+ * La hoja completa, 54 códigos, la carga la importación de SBA-12. Siembra
+ * también tipos de población sintéticos mientras Cáritas aprueba la lista
+ * inicial (esquema de beneficiarios, 5.2): sin ellos no se puede dar de alta
+ * una institución.
  *
  *   pnpm --filter @sigba/api exec prisma db seed
  *
@@ -82,6 +85,9 @@ const PRESENTACIONES_DE_ARROZ = [
   { presentacion: 'arroba', equivalenciaKg: '12.5' },
 ];
 
+/** Lista sintética, los ejemplos de la sección 5.2 del esquema de beneficiarios. */
+const TIPOS_DE_POBLACION = ['Familias', 'Adultos mayores', 'Habitantes de calle'];
+
 const prisma = new PrismaClient();
 
 async function sembrar(): Promise<void> {
@@ -142,6 +148,14 @@ async function sembrar(): Promise<void> {
           creadoPor: 'semilla',
         },
       });
+    }
+
+    // El UNIQUE es sobre lower(nombre), que Prisma no expresa: no hay upsert.
+    for (const nombre of TIPOS_DE_POBLACION) {
+      await tx.$executeRaw`
+        INSERT INTO beneficiarios.tipo_poblacion (banco_id, nombre)
+        VALUES (${BANCO_ID}::uuid, ${nombre})
+        ON CONFLICT (banco_id, lower(nombre)) DO NOTHING`;
     }
   });
 }

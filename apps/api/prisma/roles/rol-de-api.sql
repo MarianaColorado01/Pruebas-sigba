@@ -81,6 +81,10 @@ GRANT SELECT, INSERT, UPDATE ON inventario.producto TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON inventario.referencia TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON inventario.donante TO sigba_app;
 
+-- beneficiarios: ninguna tabla admite DELETE (esquema v5.0, sección 4).
+GRANT SELECT, INSERT, UPDATE ON beneficiarios.tipo_poblacion TO sigba_app;
+GRANT SELECT, INSERT, UPDATE ON beneficiarios.institucion TO sigba_app;
+
 -- 4. Funciones SECURITY DEFINER
 -- Cada migración que cree una función SECURITY DEFINER le quita EXECUTE a
 -- PUBLIC y añade aquí su GRANT EXECUTE a sigba_app, en el mismo PR. La
@@ -88,7 +92,6 @@ GRANT SELECT, INSERT, UPDATE ON inventario.donante TO sigba_app;
 --
 -- Pendientes al rebasar sobre este cambio:
 --   #20: core.registrar_auditoria(text, text, text, text, jsonb) y SELECT en core.auditoria
---   #22: beneficiarios.institucion y beneficiarios.tipo_poblacion
 
 -- Identidad de Auth0 antes de que exista contexto de tenant (SBA-8).
 GRANT EXECUTE ON FUNCTION plataforma.resolver_usuario_auth0(text, text) TO sigba_app;

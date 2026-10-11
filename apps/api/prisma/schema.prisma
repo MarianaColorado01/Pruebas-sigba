@@ -241,3 +241,65 @@ model Donante {
   @@map("donante")
   @@schema("inventario")
 }
+
+enum TipoInstitucion {
+  parroquia
+  comunidad_religiosa
+  fundacion
+
+  @@map("tipo_institucion")
+  @@schema("beneficiarios")
+}
+
+enum DiaSemana {
+  lunes
+  martes
+  miercoles
+  jueves
+  viernes
+  sabado
+  domingo
+
+  @@map("dia_semana")
+  @@schema("beneficiarios")
+}
+
+/// Catálogo por banco que administra coordinación. El índice único sobre
+/// lower(nombre) va a mano en la migración (Prisma no expresa expresiones).
+model TipoPoblacion {
+  id      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoId String  @map("banco_id") @db.Uuid
+  nombre  String  @db.VarChar(100)
+  activo  Boolean @default(true)
+
+  instituciones Institucion[]
+
+  @@unique([bancoId, id])
+  @@map("tipo_poblacion")
+  @@schema("beneficiarios")
+}
+
+/// Directorio de instituciones (SBA-26). El UNIQUE sobre lower(nombre) y el
+/// CHECK de actualizado_por/actualizado_en van a mano en la migración.
+model Institucion {
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoId          String          @map("banco_id") @db.Uuid
+  nombre           String          @db.VarChar(200)
+  tipo             TipoInstitucion
+  contactoNombre   String          @map("contacto_nombre") @db.VarChar(200)
+  contactoTelefono String?         @map("contacto_telefono") @db.VarChar(30)
+  contactoCorreo   String?         @map("contacto_correo") @db.VarChar(200)
+  direccion        String?         @db.VarChar(500)
+  diaRecogida      DiaSemana?      @map("dia_recogida")
+  tipoPoblacionId  String          @map("tipo_poblacion_id") @db.Uuid
+  activa           Boolean         @default(true)
+  actualizadoPor   String?         @map("actualizado_por") @db.VarChar(100)
+  actualizadoEn    DateTime?       @map("actualizado_en") @db.Timestamptz
+
+  tipoPoblacion TipoPoblacion @relation(fields: [bancoId, tipoPoblacionId], references: [bancoId, id])
+
+  @@unique([bancoId, id])
+  @@index([bancoId, activa])
+  @@map("institucion")
+  @@schema("beneficiarios")
+}

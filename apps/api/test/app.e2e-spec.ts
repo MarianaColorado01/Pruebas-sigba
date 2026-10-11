@@ -36,6 +36,10 @@ describe('API (e2e)', () => {
     expect(typeof respuesta.body.tiempoEnPie).toBe('number');
   });
 
+  it('el directorio de instituciones exige identidad (SBA-26, SBA-18)', () => {
+    return request(app.getHttpServer()).get('/api/v1/instituciones').expect(401);
+  });
+
   it('no sirve nada fuera del prefijo /api/v1', () => {
     return request(app.getHttpServer()).get('/health').expect(404);
   });
