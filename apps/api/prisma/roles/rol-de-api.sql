@@ -79,6 +79,10 @@ GRANT SELECT, INSERT, UPDATE ON plataforma.usuario_rol TO sigba_app;
 -- core.registrar_auditoria (sección 4).
 GRANT SELECT ON core.auditoria TO sigba_app;
 
+-- core: comando_procesado se escribe solo con core.reclamar_comando (sección 4).
+-- El SELECT deja que las pruebas de aislamiento demuestren la política como sigba_app.
+GRANT SELECT ON core.comando_procesado TO sigba_app;
+
 -- inventario
 GRANT SELECT, INSERT, UPDATE ON inventario.categoria TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON inventario.producto TO sigba_app;
@@ -99,5 +103,8 @@ GRANT EXECUTE ON FUNCTION plataforma.resolver_usuario_auth0(text, text) TO sigba
 
 -- Auditoría (SBA-21): la única escritura en core.auditoria pasa por aquí.
 GRANT EXECUTE ON FUNCTION core.registrar_auditoria(text, text, text, text, jsonb) TO sigba_app;
+
+-- Idempotencia de comandos (SBA-69).
+GRANT EXECUTE ON FUNCTION core.reclamar_comando(uuid, smallint, text, text, uuid) TO sigba_app;
 
 COMMIT;

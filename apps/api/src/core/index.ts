@@ -19,3 +19,8 @@ export { GUARDS_GLOBALES } from './guards-globales.js';
 export * from './autorizacion/index.js';
 export * from './database/index.js';
 export * from './auditoria/audit.service.js';
+export {
+  IdempotenciaService,
+  type ComandoAReclamar,
+  type ResultadoDeComando,
+} from './idempotencia/idempotencia.service.js';

@@ -14,6 +14,8 @@ importa un módulo. El lint lo comprueba y falla si se invierte (ADR-01).
 - Guard JWT, puerto `TokenVerifier` y adaptador Auth0: implementado.
 - Roles por banco, `@Roles()` y contexto de petición: implementado en SBA-18.
 - `AuditService` y auditoría base: SBA-21.
+- `IdempotenciaService` y `core.comando_procesado`: SBA-69. Ver
+  [docs/arquitectura/idempotencia-de-comandos.md](../../../../docs/arquitectura/idempotencia-de-comandos.md).
 - `EventPublisher` y outbox transaccional: SBA-30.
 - Puertos de almacenamiento, correo, visión y precios: SBA-13 y SBA-54.
 
