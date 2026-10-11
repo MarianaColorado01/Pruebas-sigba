@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { executeTransactionWithTenant, PrismaService } from '../../../core/index.js';
+import { AuditService, executeTransactionWithTenant, PrismaService } from '../../../core/index.js';
 import { contexto } from './contexto-de-tenant.js';
 import {
   type CategoriaDelBanco,
@@ -15,7 +15,10 @@ import {
  */
 @Injectable()
 export class CategoriasPrismaRepositorio extends CategoriasRepositorio {
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditoria: AuditService,
+  ) {
     super();
   }
 
@@ -26,7 +29,7 @@ export class CategoriasPrismaRepositorio extends CategoriasRepositorio {
     return executeTransactionWithTenant<ResultadoDeGuardado>(this.prisma, async (tx) => {
       const existentes = await tx.categoria.findMany({
         where: { bancoId, codigo: { in: categorias.map((c) => c.codigo) } },
-        select: { codigo: true, nombre: true, linea: true, descripcion: true },
+        select: { id: true, codigo: true, nombre: true, linea: true, descripcion: true },
       });
       const porCodigo = new Map(existentes.map((e) => [e.codigo, e]));
       const resultado = { creadas: 0, actualizadas: 0, sinCambios: 0 };
@@ -46,15 +49,31 @@ export class CategoriasPrismaRepositorio extends CategoriasRepositorio {
         } else {
           // Prisma omite los campos undefined: una columna que el archivo no
           // trae no borra el valor guardado.
-          await tx.categoria.update({
+          const actualizada = await tx.categoria.update({
             where: { bancoId_codigo: { bancoId, codigo: categoria.codigo } },
             data: { ...categoria, actualizadoPor: actor },
+            select: { id: true },
+          });
+          await this.auditoria.registrar(tx, {
+            accion: 'actualizar',
+            entidad: 'categoria',
+            entidadId: actualizada.id,
           });
           resultado.actualizadas++;
         }
       }
 
-      await tx.categoria.createMany({ data: nuevas });
+      const creadas = await tx.categoria.createManyAndReturn({
+        data: nuevas,
+        select: { id: true },
+      });
+      for (const categoria of creadas) {
+        await this.auditoria.registrar(tx, {
+          accion: 'crear',
+          entidad: 'categoria',
+          entidadId: categoria.id,
+        });
+      }
       return resultado;
     });
   }

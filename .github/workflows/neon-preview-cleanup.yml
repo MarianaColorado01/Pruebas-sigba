@@ -1,0 +1,37 @@
+name: Neon preview cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  delete-preview:
+    name: delete preview branch
+    runs-on: ubuntu-latest
+    # Las mismas condiciones con las que CI crea la rama (ver ci.yml).
+    if: >-
+      vars.NEON_PROJECT_ID != '' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
+    steps:
+      # La rama puede no existir: el PR se cerró antes de que CI la creara, o
+      # CI corrió sin Neon. Eso no es un error; una clave inválida sí.
+      - name: Borrar solo la rama del PR cerrado
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          RAMA: preview/pr-${{ github.event.number }}
+        run: |
+          set -euo pipefail
+          api="https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches"
+          id=$(curl -fsS -G -H "Authorization: Bearer $NEON_API_KEY" \
+            --data-urlencode "search=$RAMA" "$api" |
+            jq -r --arg rama "$RAMA" '.branches[] | select(.name == $rama) | .id')
+          if [[ -z "$id" ]]; then
+            echo "La rama $RAMA no existe en Neon; no hay nada que borrar."
+            exit 0
+          fi
+          curl -fsS -X DELETE -H "Authorization: Bearer $NEON_API_KEY" "$api/$id" > /dev/null
+          echo "Rama $RAMA borrada."

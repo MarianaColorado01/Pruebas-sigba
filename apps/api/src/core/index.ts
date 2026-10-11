@@ -18,3 +18,4 @@ export { Publico } from './auth/publico.decorator.js';
 export { GUARDS_GLOBALES } from './guards-globales.js';
 export * from './autorizacion/index.js';
 export * from './database/index.js';
+export * from './auditoria/audit.service.js';

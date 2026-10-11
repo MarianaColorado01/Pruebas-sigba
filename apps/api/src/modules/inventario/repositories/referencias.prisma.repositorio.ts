@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { executeTransactionWithTenant, PrismaService } from '../../../core/index.js';
+import { AuditService, executeTransactionWithTenant, PrismaService } from '../../../core/index.js';
 import { contexto } from './contexto-de-tenant.js';
 import {
   type BusquedaDeReferencias,
@@ -87,7 +87,10 @@ interface Rechazos {
  */
 @Injectable()
 export class ReferenciasPrismaRepositorio extends ReferenciasRepositorio {
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditoria: AuditService,
+  ) {
     super();
   }
 
@@ -161,12 +164,18 @@ export class ReferenciasPrismaRepositorio extends ReferenciasRepositorio {
     const { bancoId, actor } = contexto();
 
     return escribir({ duplicado: 'Ya existe una categoría con ese código.' }, () =>
-      executeTransactionWithTenant<Categoria>(this.prisma, (tx) =>
-        tx.categoria.create({
+      executeTransactionWithTenant<Categoria>(this.prisma, async (tx) => {
+        const categoria = await tx.categoria.create({
           data: { ...datos, bancoId, creadoPor: actor, actualizadoPor: actor },
           select: COLUMNAS_DE_CATEGORIA,
-        }),
-      ),
+        });
+        await this.auditoria.registrar(tx, {
+          accion: 'crear',
+          entidad: 'categoria',
+          entidadId: categoria.id,
+        });
+        return categoria;
+      }),
     );
   }
 
@@ -182,7 +191,16 @@ export class ReferenciasPrismaRepositorio extends ReferenciasRepositorio {
           data: { ...cambios, actualizadoPor: actor },
         });
         if (count === 0) return null;
-        return tx.categoria.findUniqueOrThrow({ where: { id }, select: COLUMNAS_DE_CATEGORIA });
+        const categoria = await tx.categoria.findUniqueOrThrow({
+          where: { id },
+          select: COLUMNAS_DE_CATEGORIA,
+        });
+        await this.auditoria.registrar(tx, {
+          accion: 'actualizar',
+          entidad: 'categoria',
+          entidadId: categoria.id,
+        });
+        return categoria;
       }),
     );
   }
@@ -193,10 +211,16 @@ export class ReferenciasPrismaRepositorio extends ReferenciasRepositorio {
     return escribir(RECHAZOS_DE_PRODUCTO, () =>
       executeTransactionWithTenant<Producto>(this.prisma, async (tx) => {
         await exigirCategoriaActiva(tx, bancoId, datos.categoriaId);
-        return tx.producto.create({
+        const producto = await tx.producto.create({
           data: { ...datos, bancoId, creadoPor: actor, actualizadoPor: actor },
           select: COLUMNAS_DE_PRODUCTO,
         });
+        await this.auditoria.registrar(tx, {
+          accion: 'crear',
+          entidad: 'producto',
+          entidadId: producto.id,
+        });
+        return producto;
       }),
     );
   }
@@ -222,7 +246,16 @@ export class ReferenciasPrismaRepositorio extends ReferenciasRepositorio {
           data: { ...cambios, actualizadoPor: actor },
         });
         if (count === 0) return null;
-        return tx.producto.findUniqueOrThrow({ where: { id }, select: COLUMNAS_DE_PRODUCTO });
+        const producto = await tx.producto.findUniqueOrThrow({
+          where: { id },
+          select: COLUMNAS_DE_PRODUCTO,
+        });
+        await this.auditoria.registrar(tx, {
+          accion: 'actualizar',
+          entidad: 'producto',
+          entidadId: producto.id,
+        });
+        return producto;
       }),
     );
   }
@@ -233,10 +266,16 @@ export class ReferenciasPrismaRepositorio extends ReferenciasRepositorio {
     const fila = await escribir(RECHAZOS_DE_REFERENCIA, () =>
       executeTransactionWithTenant<FilaDeReferencia>(this.prisma, async (tx) => {
         await exigirProductoActivo(tx, bancoId, datos.productoId);
-        return tx.referencia.create({
+        const referencia = await tx.referencia.create({
           data: { ...datos, bancoId, creadoPor: actor, actualizadoPor: actor },
           select: COLUMNAS_DE_REFERENCIA,
         });
+        await this.auditoria.registrar(tx, {
+          accion: 'crear',
+          entidad: 'referencia',
+          entidadId: referencia.id,
+        });
+        return referencia;
       }),
     );
     return aReferencia(fila);
@@ -266,7 +305,16 @@ export class ReferenciasPrismaRepositorio extends ReferenciasRepositorio {
           data: { ...cambios, actualizadoPor: actor },
         });
         if (count === 0) return null;
-        return tx.referencia.findUniqueOrThrow({ where: { id }, select: COLUMNAS_DE_REFERENCIA });
+        const referencia = await tx.referencia.findUniqueOrThrow({
+          where: { id },
+          select: COLUMNAS_DE_REFERENCIA,
+        });
+        await this.auditoria.registrar(tx, {
+          accion: 'actualizar',
+          entidad: 'referencia',
+          entidadId: referencia.id,
+        });
+        return referencia;
       }),
     );
     return fila && aReferencia(fila);

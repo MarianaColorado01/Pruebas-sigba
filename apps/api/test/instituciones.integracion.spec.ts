@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { AuditService } from '../src/core/auditoria/audit.service.js';
 import { type PrismaService, runWithTenantContext } from '../src/core/database/index.js';
 import { InstitucionesPrismaRepositorio } from '../src/modules/beneficiarios/repositories/instituciones.prisma.repositorio.js';
 import {
@@ -69,7 +70,7 @@ describe.skipIf(!URL_ADMIN)('Directorio de instituciones contra PostgreSQL (SBA-
 
     app = new PrismaClient({ datasourceUrl: urlComoRolApp(URL_ADMIN as string) });
     // PrismaService es un PrismaClient; aquí va uno conectado con el rol de la app.
-    repositorio = new InstitucionesPrismaRepositorio(app as PrismaService);
+    repositorio = new InstitucionesPrismaRepositorio(app as PrismaService, new AuditService());
   });
 
   beforeEach(async () => {
@@ -115,6 +116,20 @@ describe.skipIf(!URL_ADMIN)('Directorio de instituciones contra PostgreSQL (SBA-
     const [fila] = await admin.$queryRaw<{ banco_id: string }[]>`
       SELECT banco_id::text FROM beneficiarios.institucion WHERE id = ${institucion.id}::uuid`;
     expect(fila).toEqual({ banco_id: bancoA });
+  });
+
+  it('crear y editar quedan en auditoría con el banco de la petición (RNF-04)', async () => {
+    const { id } = await enBanco(bancoA, () => repositorio.crear(datos()));
+    await enBanco(bancoA, () => repositorio.actualizar(id, { activa: false }));
+
+    const registros = await admin.$queryRaw<{ banco_id: string; accion: string }[]>`
+      SELECT banco_id::text, accion FROM core.auditoria
+      WHERE entidad = 'institucion' AND entidad_id = ${id}
+      ORDER BY ocurrido_en, accion DESC`;
+    expect(registros).toEqual([
+      { banco_id: bancoA, accion: 'crear' },
+      { banco_id: bancoA, accion: 'actualizar' },
+    ]);
   });
 
   it('el banco B no ve las instituciones del banco A', async () => {

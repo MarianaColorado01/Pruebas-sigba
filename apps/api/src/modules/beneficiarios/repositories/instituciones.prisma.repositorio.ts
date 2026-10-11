@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { executeTransactionWithTenant, PrismaService } from '../../../core/index.js';
+import { AuditService, executeTransactionWithTenant, PrismaService } from '../../../core/index.js';
 import { contextoDeEscritura } from './contexto-de-tenant.js';
 import {
   type BusquedaDeInstituciones,
@@ -38,7 +38,10 @@ const LLAVE_FORANEA_VIOLADA = 'P2003';
  */
 @Injectable()
 export class InstitucionesPrismaRepositorio extends InstitucionesRepositorio {
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditoria: AuditService,
+  ) {
     super();
   }
 
@@ -46,12 +49,18 @@ export class InstitucionesPrismaRepositorio extends InstitucionesRepositorio {
     const { bancoId, actor } = contextoDeEscritura();
 
     return this.traducirErrores(() =>
-      executeTransactionWithTenant<Institucion>(this.prisma, (tx) =>
-        tx.institucion.create({
+      executeTransactionWithTenant<Institucion>(this.prisma, async (tx) => {
+        const institucion = await tx.institucion.create({
           data: { ...datos, bancoId, actualizadoPor: actor, actualizadoEn: new Date() },
           select: COLUMNAS,
-        }),
-      ),
+        });
+        await this.auditoria.registrar(tx, {
+          accion: 'crear',
+          entidad: 'institucion',
+          entidadId: institucion.id,
+        });
+        return institucion;
+      }),
     );
   }
 
@@ -81,7 +90,16 @@ export class InstitucionesPrismaRepositorio extends InstitucionesRepositorio {
           data: { ...cambios, actualizadoPor: actor, actualizadoEn: new Date() },
         });
         if (count === 0) return null;
-        return tx.institucion.findUniqueOrThrow({ where: { id }, select: COLUMNAS });
+        const institucion = await tx.institucion.findUniqueOrThrow({
+          where: { id },
+          select: COLUMNAS,
+        });
+        await this.auditoria.registrar(tx, {
+          accion: 'actualizar',
+          entidad: 'institucion',
+          entidadId: institucion.id,
+        });
+        return institucion;
       }),
     );
   }

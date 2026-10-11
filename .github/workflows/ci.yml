@@ -96,10 +96,6 @@ jobs:
           --health-retries 10
 
     env:
-      # Datos sintéticos y base efímera: nunca una copia de producción
-      # (Arquitectura 7.1).
-      DATABASE_URL: postgresql://sigba:sigba@localhost:5432/sigba
-      API_DATABASE_URL: postgresql://sigba_app:sigba_app_ci@localhost:5432/sigba
       CORS_ORIGINS: http://localhost:5173
 
     steps:
@@ -110,12 +106,77 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Un PR de este repositorio prueba contra su rama de Neon, hija de
+      # staging. En push a main, en un PR desde un fork o de Dependabot (no
+      # reciben los secretos de Actions) o sin NEON_PROJECT_ID configurado,
+      # usa el Postgres de servicio.
+      - name: Crear o reutilizar la rama Neon del PR
+        id: neon
+        if: >-
+          github.event_name == 'pull_request' &&
+          vars.NEON_PROJECT_ID != '' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.actor != 'dependabot[bot]'
+        uses: neondatabase/create-branch-action@72ed4f69a12b6be9c16aebfad893f6a21e9aba8b # v6.4.0
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: preview/pr-${{ github.event.number }}
+          parent_branch: staging
+          role: neondb_owner
+          database: neondb
+          prisma: true
+      # Migraciones, pruebas y Nest leen DATABASE_URL de este paso y de ningún
+      # otro. Datos sintéticos siempre, nunca una copia de producción
+      # (Arquitectura 7.1).
+      - name: Base de datos de las pruebas
+        env:
+          USA_NEON: ${{ steps.neon.outcome == 'success' }}
+          NEON_URL: ${{ steps.neon.outputs.db_url }}
+          NEON_RAMA_ID: ${{ steps.neon.outputs.branch_id }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          RAMA_ESPERADA: preview/pr-${{ github.event.number }}
+        run: |
+          set -euo pipefail
+          if [[ "$USA_NEON" == true ]]; then
+            if [[ -z "$NEON_URL" ]]; then
+              echo "::error::Neon no devolvió la URL de $RAMA_ESPERADA."
+              exit 1
+            fi
+            echo "::add-mask::$NEON_URL"
+            nombre=$(curl -fsS -H "Authorization: Bearer $NEON_API_KEY" \
+              "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches/$NEON_RAMA_ID" |
+              jq -r .branch.name)
+            if [[ "$nombre" != "$RAMA_ESPERADA" ]]; then
+              echo "::error::La URL de Neon es de la rama \"$nombre\", no de $RAMA_ESPERADA."
+              exit 1
+            fi
+            url="$NEON_URL"
+          else
+            url=postgresql://sigba:sigba@localhost:5432/sigba
+          fi
+          # Clave aleatoria de sigba_app en esta corrida: nunca una fija en Git.
+          clave=$(openssl rand -hex 24)
+          echo "::add-mask::$clave"
+          api_url=$(sed -E "s#^(postgres(ql)?://)[^@]+@#\1sigba_app:$clave@#" <<< "$url")
+          echo "::add-mask::$api_url"
+          {
+            echo "DATABASE_URL=$url"
+            echo "API_DATABASE_URL=$api_url"
+          } >> "$GITHUB_ENV"
       - name: migraciones
         run: pnpm --filter @sigba/api exec prisma migrate deploy
       # El rol de la API va después de cada migración, como en los despliegues.
       # Las pruebas lo vuelven a aplicar sobre la misma base.
+      # db:roles crea sigba_app sin LOGIN; la clave es la de API_DATABASE_URL.
       - name: rol de la API
-        run: pnpm --filter @sigba/api run db:roles
+        run: |
+          set -euo pipefail
+          pnpm --filter @sigba/api run db:roles
+          clave=$(node -e 'console.log(decodeURIComponent(new URL(process.env.API_DATABASE_URL).password))')
+          echo "ALTER ROLE sigba_app LOGIN PASSWORD '$clave'" |
+            pnpm --filter @sigba/api exec prisma db execute --stdin --schema prisma/schema.prisma
       - run: pnpm run test
 
   build:

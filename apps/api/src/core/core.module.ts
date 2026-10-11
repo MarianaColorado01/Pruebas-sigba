@@ -15,17 +15,19 @@ import { TOKEN_VERIFIER } from './auth/token-verifier.js';
  * Implementa autenticación OIDC y comparte la conexión a base de datos. La
  * autorización y el resolutor de identidad se componen desde AppModule.
  */
+import { AuditService } from './auditoria/audit.service.js';
 import { PrismaService } from './database/prisma.service.js';
 
 @Global()
 @Module({
   providers: [
     PrismaService,
+    AuditService,
     {
       provide: TOKEN_VERIFIER,
       useFactory: () => new Auth0TokenVerifier(cargarConfiguracionAuth0()),
     },
   ],
-  exports: [PrismaService, TOKEN_VERIFIER],
+  exports: [PrismaService, AuditService, TOKEN_VERIFIER],
 })
 export class CoreModule {}
