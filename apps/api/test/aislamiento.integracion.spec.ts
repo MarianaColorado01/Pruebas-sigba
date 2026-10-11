@@ -127,7 +127,9 @@ describe.skipIf(!hayBaseDeDatos)(
           VALUES (${bancoB}::uuid, 'Bodega colada desde el banco A')`,
           { bancoId: bancoA },
         ),
-      ).rejects.toThrow();
+        // Lo rechaza el WITH CHECK, no la falta de GRANT: un «permission
+        // denied» también lanzaría y no probaría la política.
+      ).rejects.toThrow(/row-level security/);
 
       // Y no quedó escrita.
       const cuenta = await admin.$queryRaw<{ n: bigint }[]>`

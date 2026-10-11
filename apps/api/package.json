@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "prisma generate && nest build",
+    "db:roles": "prisma db execute --schema prisma/schema.prisma --file prisma/roles/rol-de-api.sql",
     "dev": "nest start --watch",
     "start": "node dist/main",
     "importar-codigos": "node dist/importar-codigos.js",

@@ -110,6 +110,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: migraciones
         run: pnpm --filter @sigba/api exec prisma migrate deploy
+      # El rol de la API va después de cada migración, como en los despliegues.
+      # Las pruebas lo vuelven a aplicar sobre la misma base.
+      - name: rol de la API
+        run: pnpm --filter @sigba/api run db:roles
       - run: pnpm run test
 
   build:
