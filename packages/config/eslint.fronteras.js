@@ -43,6 +43,7 @@ export const SDK_DE_PROVEEDORES = [
   'auth0',
   'express-oauth2-jwt-bearer',
   'jwks-rsa',
+  'jose',
   '@sentry/*',
   'nodemailer',
   'openai',

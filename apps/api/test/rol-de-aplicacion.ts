@@ -15,8 +15,14 @@ import { PrismaClient } from '@prisma/client';
  */
 
 const ROL_APP = 'sigba_app';
-/** Clave de prueba sobre una base efímera con datos sintéticos. */
-const CLAVE_APP = 'prueba_aislamiento';
+/**
+ * Clave de prueba sobre una base efímera con datos sintéticos. Es la de
+ * `API_DATABASE_URL` si existe: la e2e levanta `AppModule`, que se conecta
+ * con esa URL, y tiene que encontrar la misma clave.
+ */
+const CLAVE_APP = process.env['API_DATABASE_URL']
+  ? decodeURIComponent(new URL(process.env['API_DATABASE_URL']).password)
+  : 'prueba_aislamiento';
 
 /** La misma base que `DATABASE_URL`, pero con el rol de la API. */
 export function urlComoRolApp(base: string): string {

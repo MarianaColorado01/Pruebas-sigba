@@ -4,6 +4,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type AsignacionActiva, SesionContext, usePedir } from './sesion.ts';
 import { SoloPara } from './SoloPara.tsx';
 
+vi.mock('@auth0/auth0-react', () => ({
+  Auth0Provider: ({ children }: { children: import('react').ReactNode }) => children,
+  useAuth0: () => ({
+    getAccessTokenSilently: vi.fn().mockResolvedValue('synthetic-access-token'),
+  }),
+}));
+
 const bancoA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const bancoB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const instX = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -78,6 +85,12 @@ describe('usePedir', () => {
     expect(cabeceras.has('x-banco-id')).toBe(false);
   });
 
+  it('envía el access token como bearer', async () => {
+    const cabeceras = await cabecerasEnviadas(institucion);
+
+    expect(cabeceras.get('authorization')).toBe('Bearer synthetic-access-token');
+  });
+
   it('conserva las cabeceras que llegan en un Headers', async () => {
     const cabeceras = await cabecerasEnviadas(operario, new Headers({ 'if-none-match': '"v1"' }));
 
@@ -89,7 +102,12 @@ describe('usePedir', () => {
   it('lee un arreglo de pares sin mandar una cabecera «0»', async () => {
     const cabeceras = await cabecerasEnviadas(operario, [['if-none-match', '"v1"']]);
 
-    expect([...cabeceras.keys()]).toEqual(['content-type', 'if-none-match', 'x-banco-id']);
+    expect([...cabeceras.keys()]).toEqual([
+      'authorization',
+      'content-type',
+      'if-none-match',
+      'x-banco-id',
+    ]);
     expect(cabeceras.get('if-none-match')).toBe('"v1"');
   });
 

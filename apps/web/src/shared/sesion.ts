@@ -1,6 +1,8 @@
+import { useAuth0 } from '@auth0/auth0-react';
 import { createContext, useCallback, useContext } from 'react';
 import { CABECERAS, type Rol } from '@sigba/shared-types';
-import { pedir } from './clienteHttp.ts';
+import { useEstadoReautenticacion } from './reautenticacion.ts';
+import { ErrorDeApi, pedir } from './clienteHttp.ts';
 
 /**
  * Con qué rol, banco e institución actúa la persona en esta sesión
@@ -43,10 +45,35 @@ function cabecerasDe(asignacion: AsignacionActiva | null, propias?: HeadersInit)
  */
 export function usePedir() {
   const asignacion = useAsignacion();
+  const { getAccessTokenSilently } = useAuth0();
+  const { marcarRequerido } = useEstadoReautenticacion();
 
   return useCallback(
-    <T>(ruta: string, opciones: RequestInit = {}) =>
-      pedir<T>(ruta, { ...opciones, headers: cabecerasDe(asignacion, opciones.headers) }),
-    [asignacion],
+    async <T>(ruta: string, opciones: RequestInit = {}) => {
+      try {
+        const accessToken = await getAccessTokenSilently();
+        marcarRequerido(false);
+        return await pedir<T>(
+          ruta,
+          { ...opciones, headers: cabecerasDe(asignacion, opciones.headers) },
+          accessToken,
+        );
+      } catch (error) {
+        const codigoAuth0 =
+          typeof error === 'object' && error !== null && 'error' in error ? error.error : undefined;
+        marcarRequerido(
+          (error instanceof ErrorDeApi && error.estado === 401) ||
+            (typeof codigoAuth0 === 'string' &&
+              [
+                'login_required',
+                'consent_required',
+                'missing_refresh_token',
+                'invalid_grant',
+              ].includes(codigoAuth0)),
+        );
+        throw error;
+      }
+    },
+    [asignacion, getAccessTokenSilently, marcarRequerido],
   );
 }

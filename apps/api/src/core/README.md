@@ -8,16 +8,14 @@ errores, logging, outbox, auditoría y los puertos de proveedores
 dependencia va en un solo sentido: los módulos importan `core`; `core` nunca
 importa un módulo. El lint lo comprueba y falla si se invierte (ADR-01).
 
-## Qué falta y en qué ticket entra
+## Estado
 
-| Pieza                                                           | Ticket         |
-| --------------------------------------------------------------- | -------------- |
-| Contexto de tenant (`AsyncLocalStorage`) y RLS por banco        | SBA-6          |
-| Guard de JWT y adaptador OIDC de Auth0                          | SBA-8          |
-| Roles por banco, `@Roles()` y contexto de petición              | SBA-18         |
-| `AuditService` y auditoría base                                 | SBA-21         |
-| `EventPublisher` y outbox transaccional                         | SBA-30         |
-| Puertos de proveedores: almacenamiento, correo, visión, precios | SBA-13, SBA-54 |
+- Contexto de tenant (`AsyncLocalStorage`) y RLS por banco: implementado en SBA-6.
+- Guard JWT, puerto `TokenVerifier` y adaptador Auth0: implementado.
+- Roles por banco, `@Roles()` y contexto de petición: implementado en SBA-18.
+- `AuditService` y auditoría base: SBA-21.
+- `EventPublisher` y outbox transaccional: SBA-30.
+- Puertos de almacenamiento, correo, visión y precios: SBA-13 y SBA-54.
 
-Cada uno entra por PR. `core/` es ruta con CODEOWNER: todo cambio pasa por
-revisión de arquitectura (Arquitectura 5.2).
+`core/` es ruta con CODEOWNER: todo cambio pasa por revisión de arquitectura
+(Arquitectura 5.2).

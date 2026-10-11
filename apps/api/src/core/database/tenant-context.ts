@@ -10,12 +10,10 @@ import type { Rol } from '@sigba/shared-types';
 export interface TenantContext {
   bancoId?: string;
   institucionId?: string;
-  /**
-   * En peticiones HTTP, el id de `plataforma.usuario`; en comandos y pruebas,
-   * una etiqueta como 'importar-codigos'. SBA-8 y SBA-21 deciden si debe ser
-   * siempre el id.
-   */
+  /** UUID interno de `plataforma.usuario`; se usa en app.usuario_id y auditoría. */
   usuarioId?: string;
+  /** Etiqueta de comandos, usada en `creado_por` y en app.actor, nunca en RLS. */
+  actor?: string;
   rol?: Rol;
 }
 

@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from './../src/app.module.js';
+import { corsOrigins } from '../src/cors.js';
 
 /**
  * Levanta la aplicación completa. Lo que comprueba antes que nada es que
@@ -19,6 +20,7 @@ describe('API (e2e)', () => {
     }).compile();
 
     app = modulo.createNestApplication();
+    app.enableCors({ origin: corsOrigins('http://localhost:5173') });
     app.setGlobalPrefix('api/v1');
     await app.init();
   });
@@ -36,5 +38,28 @@ describe('API (e2e)', () => {
 
   it('no sirve nada fuera del prefijo /api/v1', () => {
     return request(app.getHttpServer()).get('/health').expect(404);
+  });
+
+  it('permite el preflight de la PWA con Authorization', async () => {
+    const respuesta = await request(app.getHttpServer())
+      .options('/api/v1/health')
+      .set('Origin', 'http://localhost:5173')
+      .set('Access-Control-Request-Method', 'GET')
+      .set('Access-Control-Request-Headers', 'authorization')
+      .expect(204);
+
+    expect(respuesta.headers['access-control-allow-origin']).toBe('http://localhost:5173');
+    expect(respuesta.headers['access-control-allow-headers']).toMatch(/authorization/i);
+  });
+
+  it('no autoriza el preflight de un origen desconocido', async () => {
+    const respuesta = await request(app.getHttpServer())
+      .options('/api/v1/health')
+      .set('Origin', 'https://origen-desconocido.example')
+      .set('Access-Control-Request-Method', 'GET')
+      .set('Access-Control-Request-Headers', 'authorization')
+      .expect(204);
+
+    expect(respuesta.headers['access-control-allow-origin']).toBeUndefined();
   });
 });

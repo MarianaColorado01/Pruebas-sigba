@@ -17,6 +17,11 @@ const CLAVE_BANCO = 'app.banco_id';
 const CLAVE_INSTITUCION = 'app.institucion_id';
 /** Solo la lee la política que deja a cada usuario ver sus asignaciones (SBA-18). */
 const CLAVE_USUARIO = 'app.usuario_id';
+/**
+ * Etiqueta de un comando sin usuario, como `importar-codigos`. Ninguna política
+ * la lee: la auditoría la registra como actor de sistema cuando no hay usuario.
+ */
+const CLAVE_ACTOR = 'app.actor';
 
 /**
  * Fija el contexto dentro de la transacción. Sin contexto escribe cadena vacía,
@@ -26,6 +31,7 @@ async function fijarContexto(tx: Prisma.TransactionClient, ctx?: TenantContext):
   await tx.$executeRaw`SELECT set_config(${CLAVE_BANCO}, ${ctx?.bancoId ?? ''}, true)`;
   await tx.$executeRaw`SELECT set_config(${CLAVE_INSTITUCION}, ${ctx?.institucionId ?? ''}, true)`;
   await tx.$executeRaw`SELECT set_config(${CLAVE_USUARIO}, ${ctx?.usuarioId ?? ''}, true)`;
+  await tx.$executeRaw`SELECT set_config(${CLAVE_ACTOR}, ${ctx?.actor ?? ''}, true)`;
 }
 
 export async function executeTransactionWithTenant<R>(

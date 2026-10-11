@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     root: './',
+    setupFiles: ['./test/auth0-test-env.ts'],
     include: ['src/**/*.spec.ts', 'test/**/*.spec.ts'],
     // Crea el rol sin privilegios de las pruebas de integración una sola vez.
     globalSetup: ['./test/rol-de-aplicacion.ts'],

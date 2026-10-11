@@ -42,20 +42,21 @@ aplica el script y le pone a `sigba_app` la clave de prueba
 `prueba_aislamiento`. Las pruebas de integración se conectan con ese rol.
 
 Corre `pnpm test` solo contra la base de `docker compose`. Contra otra base le
-cambiaría la clave al `sigba_app` de verdad, además de borrar filas.
+cambiaría la clave al `sigba_app` de verdad, además de borrar filas. Si hay
+`API_DATABASE_URL`, la clave de prueba es la de esa URL; si no,
+`prueba_aislamiento`.
 
-`pnpm dev` sigue conectando como `sigba`, el superusuario de la imagen. Para
-probar la API con el rol real:
+`pnpm dev` conecta la API como `sigba_app` por `API_DATABASE_URL`, y las
+migraciones y el seed como `sigba` por `DATABASE_URL`. La primera vez:
 
 ```bash
 pnpm --filter @sigba/api exec prisma migrate deploy
 pnpm --filter @sigba/api run db:roles
-psql postgresql://sigba:sigba@localhost:5432/sigba \
-  -c "ALTER ROLE sigba_app LOGIN PASSWORD 'sigba_app'"
+docker compose exec postgres psql -U sigba \
+  -c "ALTER ROLE sigba_app LOGIN PASSWORD 'sigba_app_local'"
 ```
 
-y arranca la API con
-`DATABASE_URL=postgresql://sigba_app:sigba_app@localhost:5432/sigba`.
+La clave es la de `API_DATABASE_URL` en `.env.example`.
 
 Si tu base local tiene un rol `sigba_app_prueba` de corridas anteriores, puedes
 borrarlo; ya no se usa.
@@ -67,9 +68,9 @@ lo vuelve a aplicar en el `globalSetup` y otra vez en
 `rol-de-api.integracion.spec.ts`. Cada corrida aplica el script tres veces sobre
 la misma base.
 
-La e2e que levanta `AppModule` sigue conectando como `sigba`: `PrismaService`
-solo lee `DATABASE_URL`, que también usan las migraciones. Cuando exista
-`API_DATABASE_URL` (PR #20), CI puede pasarle la URL de `sigba_app` a la e2e.
+La e2e que levanta `AppModule` se conecta como `sigba_app` por
+`API_DATABASE_URL`. Usa el mismo `globalSetup` que las pruebas de integración,
+así que el rol tiene LOGIN y la clave de esa URL aunque la e2e corra sola.
 
 ## Staging y producción (Neon)
 
@@ -81,9 +82,9 @@ vez por rama de base:
 2. Desde `psql`, con la URL del dueño:
    `ALTER ROLE sigba_app LOGIN PASSWORD '<clave larga y aleatoria>'`. La clave
    va al gestor de secretos y a Fly.io, nunca a Git.
-3. La API se conecta como `sigba_app`: hoy por `DATABASE_URL` en los secretos
-   de Fly.io, y por `API_DATABASE_URL` cuando entre el PR #20. El paso de
-   migraciones usa la URL del dueño.
+3. La API se conecta como `sigba_app` por `API_DATABASE_URL`, en los
+   secretos de Fly.io. Las migraciones usan la URL del dueño en
+   `DATABASE_URL`.
 
 No crees `sigba_app` desde la consola de Neon: los roles creados ahí entran
 como miembros de `neon_superuser` y heredan sus privilegios. El script lo

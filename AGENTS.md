@@ -25,6 +25,10 @@ corepack prepare pnpm@11.18.0 --activate
 pnpm install
 cp .env.example .env
 docker compose up -d
+pnpm --filter @sigba/api exec prisma migrate deploy
+pnpm --filter @sigba/api run db:roles
+docker compose exec postgres psql -U sigba \
+  -c "ALTER ROLE sigba_app LOGIN PASSWORD 'sigba_app_local'"
 pnpm dev
 ```
 

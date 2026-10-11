@@ -3,7 +3,7 @@
  * el manejo de errores, para que ninguna feature hable con `fetch` directo.
  *
  * El token de Auth0 se mantiene en memoria, no en almacenamiento persistente
- * (ADR-06). La reautenticación al sincronizar llega con SBA-8.
+ * (ADR-06).
  */
 
 const BASE = import.meta.env['VITE_API_URL'] ?? '/api/v1';
@@ -18,11 +18,16 @@ export class ErrorDeApi extends Error {
   }
 }
 
-export async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
+export async function pedir<T>(
+  ruta: string,
+  opciones: RequestInit = {},
+  accessToken?: string,
+): Promise<T> {
   // Con spread, un `Headers` llega vacío y un arreglo de pares llega como una
   // cabecera «0»; `new Headers()` lee las tres formas de `HeadersInit`.
   const headers = new Headers(opciones.headers);
   if (!headers.has('content-type')) headers.set('content-type', 'application/json');
+  if (accessToken) headers.set('authorization', `Bearer ${accessToken}`);
 
   const respuesta = await fetch(`${BASE}${ruta}`, { ...opciones, headers });
 

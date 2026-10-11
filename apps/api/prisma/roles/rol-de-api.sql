@@ -87,7 +87,10 @@ GRANT SELECT, INSERT, UPDATE ON inventario.donante TO sigba_app;
 -- migración no concede nada a sigba_app.
 --
 -- Pendientes al rebasar sobre este cambio:
---   #19: plataforma.resolver_usuario_auth0(text, text)
 --   #20: core.registrar_auditoria(text, text, text, text, jsonb) y SELECT en core.auditoria
+--   #22: beneficiarios.institucion y beneficiarios.tipo_poblacion
+
+-- Identidad de Auth0 antes de que exista contexto de tenant (SBA-8).
+GRANT EXECUTE ON FUNCTION plataforma.resolver_usuario_auth0(text, text) TO sigba_app;
 
 COMMIT;

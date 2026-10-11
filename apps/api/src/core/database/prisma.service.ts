@@ -2,6 +2,14 @@ import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/com
 import { PrismaClient } from '@prisma/client';
 import { createExtendedPrismaClient, type ExtendedPrismaClient } from './prisma-rls.extension.js';
 
+function opcionesConexionApi() {
+  const url = process.env['API_DATABASE_URL'];
+  if (!url && process.env['DATABASE_URL']) {
+    throw new Error('Configura API_DATABASE_URL con las credenciales del rol sigba_app.');
+  }
+  return url ? { datasourceUrl: url } : {};
+}
+
 /**
  * Servicio centralizado de conexión a PostgreSQL vía Prisma (ADR-05).
  * Provee acceso al cliente extendido con soporte para transacciones con RLS
@@ -12,15 +20,15 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private _extendedClient?: ExtendedPrismaClient;
 
   constructor() {
-    super();
+    super(opcionesConexionApi());
   }
 
   async onModuleInit(): Promise<void> {
-    // Sin DATABASE_URL no hay nada que conectar: es el caso de las pruebas
+    // Sin API_DATABASE_URL no hay nada que conectar: es el caso de las pruebas
     // unitarias, que no tocan la base.
-    if (!process.env['DATABASE_URL']) return;
+    if (!process.env['API_DATABASE_URL']) return;
 
-    // Y si la hay, un fallo de conexión tiene que romper el arranque. Tragarlo
+    // Un fallo de conexión tiene que romper el arranque. Tragarlo
     // deja la API en pie sin base de datos, la sonda de Fly.io responde OK y el
     // despliegue queda verde mientras falla cada petición.
     await this.$connect();

@@ -117,7 +117,7 @@ async function importar(
     return 2;
   }
 
-  const reporte = await runWithTenantContext({ bancoId, usuarioId: 'importar-codigos' }, () =>
+  const reporte = await runWithTenantContext({ bancoId, actor: 'importar-codigos' }, () =>
     app.get(ImportacionCatalogoService).importar(contenido),
   );
   process.stdout.write(`Banco: ${banco.nombre}\n${formatear(reporte)}\n`);

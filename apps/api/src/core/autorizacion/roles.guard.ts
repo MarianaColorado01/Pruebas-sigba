@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { CABECERAS, type Rol } from '@sigba/shared-types';
+import { RUTA_PUBLICA } from '../auth/publico.decorator.js';
+import type { IdentidadDeAutenticacion } from '../auth/resolutor-de-identidad.js';
 import type { TenantContext } from '../database/tenant-context.js';
 import { AsignacionesDeUsuario } from './asignaciones-de-usuario.js';
 import { elegirAsignacion } from './elegir-asignacion.js';
@@ -14,14 +16,10 @@ import { elegirAsignacion } from './elegir-asignacion.js';
 /** Metadato donde `@Roles()` deja los roles permitidos. */
 export const ROLES_PERMITIDOS = 'sigba:roles-permitidos';
 
-/**
- * Lo que el guard lee y escribe en la petición. `identidad` la deja el guard
- * de JWT de SBA-8 con el `sub` validado; mientras no exista, toda ruta con
- * `@Roles()` responde 401.
- */
+/** Lo que el guard de roles lee y escribe. `identidad` la deja `JwtAuthGuard`. */
 export interface PeticionAutorizada {
   headers: Record<string, string | string[] | undefined>;
-  identidad?: { auth0Sub: string };
+  identidad?: IdentidadDeAutenticacion;
   contextoTenant?: TenantContext;
 }
 
@@ -29,13 +27,6 @@ function cabecera(peticion: PeticionAutorizada, nombre: string): string | undefi
   const valor = peticion.headers[nombre];
   return Array.isArray(valor) ? valor[0] : valor;
 }
-
-/**
- * Peticiones que este guard ya autorizó. Vive fuera de la petición para que
- * nadie más pueda marcarla: un `contextoTenant` que llegue fijado de antes no
- * cuenta como autorización.
- */
-const autorizadas = new WeakSet<PeticionAutorizada>();
 
 /**
  * Autoriza por rol dentro del banco pedido y deja listo el contexto de tenant
@@ -56,9 +47,14 @@ export class RolesGuard implements CanActivate {
   async canActivate(contexto: ExecutionContext): Promise<boolean> {
     const peticion = contexto.switchToHttp().getRequest<PeticionAutorizada>();
 
-    // Con @Roles() en la clase y en el método, Nest corre este guard dos veces
-    // y las dos leen los mismos metadatos.
-    if (autorizadas.has(peticion)) return true;
+    if (
+      this.reflector.getAllAndOverride<boolean>(RUTA_PUBLICA, [
+        contexto.getHandler(),
+        contexto.getClass(),
+      ])
+    ) {
+      return true;
+    }
 
     const permitidos =
       this.reflector.getAllAndOverride<readonly Rol[] | undefined>(ROLES_PERMITIDOS, [
@@ -68,7 +64,10 @@ export class RolesGuard implements CanActivate {
 
     if (!peticion.identidad) throw new UnauthorizedException();
 
-    const usuario = await this.asignaciones.deIdentidad(peticion.identidad.auth0Sub);
+    const usuario = await this.asignaciones.deIdentidad(
+      peticion.identidad.auth0Sub,
+      peticion.identidad.emisor,
+    );
     const elegida =
       usuario &&
       elegirAsignacion(
@@ -85,7 +84,6 @@ export class RolesGuard implements CanActivate {
       bancoId: elegida.bancoId ?? undefined,
       institucionId: elegida.institucionId ?? undefined,
     };
-    autorizadas.add(peticion);
     return true;
   }
 }

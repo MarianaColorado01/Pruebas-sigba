@@ -1,4 +1,7 @@
 import { Global, Module } from '@nestjs/common';
+import { cargarConfiguracionAuth0 } from './auth/auth0-config.js';
+import { Auth0TokenVerifier } from './auth/adapters/auth0/auth0-token-verifier.js';
+import { TOKEN_VERIFIER } from './auth/token-verifier.js';
 
 /**
  * Infraestructura compartida por todos los módulos: conexión a base de datos,
@@ -9,19 +12,20 @@ import { Global, Module } from '@nestjs/common';
  * `core` no es un cuarto módulo de alcance: los módulos dependen de él, nunca
  * al revés. El lint lo comprueba (ADR-01).
  *
- * Está vacío a propósito. Se llena en:
- *   SBA-6  · contexto de tenant y RLS por banco
- *   SBA-8  · adaptador OIDC de Auth0
- *   SBA-18 · roles por banco y guard de roles
- *   SBA-21 · auditoría base
- *   SBA-30 · outbox transaccional
+ * Implementa autenticación OIDC y comparte la conexión a base de datos. La
+ * autorización y el resolutor de identidad se componen desde AppModule.
  */
-import { AsignacionesDeUsuario } from './autorizacion/asignaciones-de-usuario.js';
 import { PrismaService } from './database/prisma.service.js';
 
 @Global()
 @Module({
-  providers: [PrismaService, AsignacionesDeUsuario],
-  exports: [PrismaService, AsignacionesDeUsuario],
+  providers: [
+    PrismaService,
+    {
+      provide: TOKEN_VERIFIER,
+      useFactory: () => new Auth0TokenVerifier(cargarConfiguracionAuth0()),
+    },
+  ],
+  exports: [PrismaService, TOKEN_VERIFIER],
 })
 export class CoreModule {}

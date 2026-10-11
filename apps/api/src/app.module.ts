@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { CoreModule } from './core/index.js';
+import { CoreModule, GUARDS_GLOBALES } from './core/index.js';
 import { HealthModule } from './modules/health/index.js';
 import { PlataformaModule } from './modules/plataforma/index.js';
 import { InventarioModule } from './modules/inventario/index.js';
@@ -19,5 +19,6 @@ import { AnaliticaModule } from './modules/analitica/index.js';
     BeneficiariosModule,
     AnaliticaModule,
   ],
+  providers: GUARDS_GLOBALES,
 })
 export class AppModule {}

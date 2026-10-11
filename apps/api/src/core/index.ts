@@ -1,14 +1,20 @@
 /**
  * API pública de `core`.
  *
- * Lo que expondrá, según Arquitectura 5.2: decoradores y guards,
- * `EventPublisher`, `AuditService` y los puertos de proveedores
- * (almacenamiento, correo, visión, precios). El guard de roles no sale suelto:
- * va dentro de `@Roles()`.
+ * Expone guards, decoradores, contexto de tenant y puertos de proveedores.
  *
  * Los módulos importan de aquí. Nada de `core` importa un módulo funcional.
  */
 
 export { CoreModule } from './core.module.js';
+export {
+  RESOLUTOR_DE_IDENTIDAD,
+  type IdentidadDeAutenticacion,
+  type ResolutorDeIdentidad,
+  type UsuarioResuelto,
+} from './auth/resolutor-de-identidad.js';
+export { TOKEN_VERIFIER, type TokenVerifier } from './auth/token-verifier.js';
+export { Publico } from './auth/publico.decorator.js';
+export { GUARDS_GLOBALES } from './guards-globales.js';
 export * from './autorizacion/index.js';
 export * from './database/index.js';

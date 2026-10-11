@@ -1,5 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ROLES, type Rol } from '@sigba/shared-types';
+import {
+  RESOLUTOR_DE_IDENTIDAD,
+  type ResolutorDeIdentidad,
+} from '../auth/resolutor-de-identidad.js';
 import { executeTransactionWithTenant } from '../database/prisma-rls.extension.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Asignacion } from './elegir-asignacion.js';
@@ -23,18 +27,17 @@ const esRol = (codigo: string): codigo is Rol => (ROLES as readonly string[]).in
  */
 @Injectable()
 export class AsignacionesDeUsuario {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(RESOLUTOR_DE_IDENTIDAD) private readonly resolutor: ResolutorDeIdentidad,
+  ) {}
 
   /**
-   * Asignaciones activas del usuario con ese `sub`, en todos sus bancos.
-   * `undefined` si el usuario no existe o está desactivado.
+   * Asignaciones activas del usuario identificado por issuer y `sub`, en
+   * todos sus bancos. `undefined` si no existe o está desactivado.
    */
-  async deIdentidad(auth0Sub: string): Promise<UsuarioConAsignaciones | undefined> {
-    // `usuario` es global y no tiene RLS por banco (ADR-07).
-    const usuario = await this.prisma.usuario.findFirst({
-      where: { auth0Sub, activo: true },
-      select: { id: true },
-    });
+  async deIdentidad(auth0Sub: string, emisor: string): Promise<UsuarioConAsignaciones | undefined> {
+    const usuario = await this.resolutor.resolverIdentidad({ auth0Sub, emisor });
     if (!usuario) return undefined;
 
     // Con app.usuario_id y sin banco, la política usuario_rol_propias deja ver
@@ -44,19 +47,19 @@ export class AsignacionesDeUsuario {
       (tx) =>
         tx.usuarioRol.findMany({
           where: {
-            usuarioId: usuario.id,
+            usuarioId: usuario.usuarioId,
             activo: true,
             OR: [{ bancoId: null }, { banco: { is: { activo: true } } }],
           },
           select: { bancoId: true, institucionId: true, rol: { select: { codigo: true } } },
         }),
-      { usuarioId: usuario.id },
+      { usuarioId: usuario.usuarioId },
     );
 
     const asignaciones = filas.flatMap(({ rol, bancoId, institucionId }) =>
       esRol(rol.codigo) ? [{ rol: rol.codigo, bancoId, institucionId }] : [],
     );
 
-    return { usuarioId: usuario.id, asignaciones };
+    return { usuarioId: usuario.usuarioId, asignaciones };
   }
 }

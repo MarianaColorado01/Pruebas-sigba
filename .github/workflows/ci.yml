@@ -99,6 +99,8 @@ jobs:
       # Datos sintéticos y base efímera: nunca una copia de producción
       # (Arquitectura 7.1).
       DATABASE_URL: postgresql://sigba:sigba@localhost:5432/sigba
+      API_DATABASE_URL: postgresql://sigba_app:sigba_app_ci@localhost:5432/sigba
+      CORS_ORIGINS: http://localhost:5173
 
     steps:
       - uses: actions/checkout@v7

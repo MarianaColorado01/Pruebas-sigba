@@ -1,4 +1,8 @@
 import { Module } from '@nestjs/common';
+import { RESOLUTOR_DE_IDENTIDAD } from '../../core/index.js';
+import { UsuariosPrismaRepositorio } from './repositories/usuarios.prisma.repositorio.js';
+import { UsuariosRepositorio } from './services/usuario.js';
+import { UsuariosService } from './services/usuarios.service.js';
 
 /**
  * Plataforma · Equipo 3
@@ -10,7 +14,11 @@ import { Module } from '@nestjs/common';
 @Module({
   imports: [],
   controllers: [],
-  providers: [],
-  exports: [],
+  providers: [
+    UsuariosService,
+    { provide: UsuariosRepositorio, useClass: UsuariosPrismaRepositorio },
+    { provide: RESOLUTOR_DE_IDENTIDAD, useExisting: UsuariosService },
+  ],
+  exports: [RESOLUTOR_DE_IDENTIDAD],
 })
 export class PlataformaModule {}

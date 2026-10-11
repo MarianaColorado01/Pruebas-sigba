@@ -62,6 +62,11 @@ describe('Contrato del esquema y la migración (ADR-05, ADR-07)', () => {
     expect(migracion).toContain('SELECT "core"."verificar_politicas_rls"();');
   });
 
+  it('la migración Auth0 conserva los datos de contacto hasta aprobar el modelo de usuarios', () => {
+    expect(migracion).not.toContain('DROP COLUMN IF EXISTS "email"');
+    expect(migracion).not.toContain('DROP COLUMN IF EXISTS "nombre"');
+  });
+
   it('el contexto de banco solo se compara como uuid, sin valores especiales', () => {
     // Un valor no-UUID en app.banco_id revienta el cast de las demás políticas.
     expect(migracion).not.toMatch(/current_setting\('app\.banco_id'[^)]*\)\s*=\s*'(?!')/);
@@ -118,7 +123,7 @@ describe('La transacción fija el contexto sin concatenar SQL', () => {
       usuarioId: usuario,
     });
 
-    expect(llamadas).toHaveLength(3);
+    expect(llamadas).toHaveLength(4);
     for (const llamada of llamadas) {
       expect(llamada.sql).toContain('set_config');
       // El valor viaja como parámetro: nunca aparece incrustado en el texto.
@@ -130,6 +135,7 @@ describe('La transacción fija el contexto sin concatenar SQL', () => {
     expect(llamadas[0]?.valores).toEqual(['app.banco_id', banco]);
     expect(llamadas[1]?.valores).toEqual(['app.institucion_id', institucion]);
     expect(llamadas[2]?.valores).toEqual(['app.usuario_id', usuario]);
+    expect(llamadas[3]?.valores).toEqual(['app.actor', '']);
   });
 
   it('sin contexto envía cadena vacía, que las políticas rechazan', async () => {
@@ -140,6 +146,19 @@ describe('La transacción fija el contexto sin concatenar SQL', () => {
     expect(llamadas[0]?.valores).toEqual(['app.banco_id', '']);
     expect(llamadas[1]?.valores).toEqual(['app.institucion_id', '']);
     expect(llamadas[2]?.valores).toEqual(['app.usuario_id', '']);
+    expect(llamadas[3]?.valores).toEqual(['app.actor', '']);
+  });
+
+  it('un actor de comando no se usa como identificador de usuario para RLS', async () => {
+    const { cliente, llamadas } = clienteFalso();
+
+    await executeTransactionWithTenant(cliente, async () => 'listo', {
+      bancoId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      actor: 'importar-codigos',
+    });
+
+    expect(llamadas[2]?.valores).toEqual(['app.usuario_id', '']);
+    expect(llamadas[3]?.valores).toEqual(['app.actor', 'importar-codigos']);
   });
 
   it('un identificador con comillas no se convierte en SQL', async () => {

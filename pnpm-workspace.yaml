@@ -5,6 +5,7 @@ packages:
 allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true
+  browser-tabs-lock: false
   esbuild: true
   prisma: true
 

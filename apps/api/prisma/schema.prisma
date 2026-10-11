@@ -63,7 +63,8 @@ model Bodega {
 
 model Usuario {
   id            String   @id @default(uuid()) @db.Uuid
-  auth0Sub      String   @unique @map("auth0_sub") @db.VarChar(200)
+  emisor        String   @db.VarChar(500)
+  auth0Sub      String   @map("auth0_sub") @db.VarChar(200)
   email         String   @unique @db.VarChar(200)
   nombre        String   @db.VarChar(200)
   activo        Boolean  @default(true)
@@ -72,6 +73,7 @@ model Usuario {
 
   roles UsuarioRol[]
 
+  @@unique([emisor, auth0Sub])
   @@map("usuario")
   @@schema("plataforma")
 }

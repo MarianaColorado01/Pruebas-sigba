@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  envDir: '../../',
   // Vite resuelve el alias @/* leyendo tsconfig.app.json. Un solo sitio donde vive.
   resolve: { tsconfigPaths: true },
   plugins: [

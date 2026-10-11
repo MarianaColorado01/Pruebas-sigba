@@ -9,5 +9,5 @@ export function contexto(): { bancoId: string; actor: string | null } {
   if (!ctx?.bancoId) {
     throw new Error('Operación en inventario sin banco en el contexto de tenant.');
   }
-  return { bancoId: ctx.bancoId, actor: ctx.usuarioId ?? null };
+  return { bancoId: ctx.bancoId, actor: ctx.actor ?? ctx.usuarioId ?? null };
 }

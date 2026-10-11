@@ -1,7 +1,10 @@
-import type { Server } from 'node:http';
+import { createSign, generateKeyPairSync } from 'node:crypto';
+import { createServer, type Server } from 'node:http';
 import { Controller, Get, type INestApplication, Post } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
+import { Auth0TokenVerifier } from '../src/core/auth/adapters/auth0/auth0-token-verifier.js';
+import { TOKEN_VERIFIER } from '../src/core/auth/token-verifier.js';
 import { ROLES } from '@sigba/shared-types';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -9,10 +12,13 @@ import { AsignacionesDeUsuario } from '../src/core/autorizacion/asignaciones-de-
 import {
   CoreModule,
   executeTransactionWithTenant,
+  GUARDS_GLOBALES,
   PrismaService,
   Roles,
   type TenantContext,
 } from '../src/core/index.js';
+import { HealthModule } from '../src/modules/health/index.js';
+import { PlataformaModule } from '../src/modules/plataforma/index.js';
 import { urlComoRolApp } from './rol-de-aplicacion.js';
 
 /**
@@ -25,9 +31,15 @@ import { urlComoRolApp } from './rol-de-aplicacion.js';
  */
 
 const URL_ADMIN = process.env['DATABASE_URL'];
+const URL_API = process.env['API_DATABASE_URL'];
 
 if (process.env['CI'] && !URL_ADMIN) {
   throw new Error('DATABASE_URL no está definida en CI. La prueba de roles no es opcional.');
+}
+if (process.env['CI'] && !URL_API) {
+  throw new Error(
+    'API_DATABASE_URL no está definida en CI. La prueba del rol real no es opcional.',
+  );
 }
 
 const red = '44444444-4444-4444-8444-444444444444';
@@ -48,10 +60,43 @@ const USUARIOS = {
 } as const;
 
 const sub = (id: string) => `prueba|${id}`;
+const emisor = 'https://prueba.sigba/';
+const audience = 'https://api.prueba.sigba/';
 const IDS_USUARIOS = Object.values(USUARIOS);
+const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const jwk = {
+  ...publicKey.export({ format: 'jwk' }),
+  kid: 'synthetic-test-key',
+  use: 'sig',
+  alg: 'RS256',
+};
 
 let admin: PrismaClient;
 let app: PrismaClient;
+let api: PrismaClient | undefined;
+let jwksServer: Server;
+let jwksUri: string;
+
+function token(usuarioSub: string, overrides: Record<string, unknown> = {}): string {
+  const ahora = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(
+    JSON.stringify({ alg: 'RS256', typ: 'JWT', kid: 'synthetic-test-key' }),
+  ).toString('base64url');
+  const payload = Buffer.from(
+    JSON.stringify({
+      iss: emisor,
+      aud: audience,
+      sub: usuarioSub,
+      iat: ahora,
+      exp: ahora + 300,
+      ...overrides,
+    }),
+  ).toString('base64url');
+  const signingInput = `${header}.${payload}`;
+  const signature = createSign('RSA-SHA256').update(signingInput).sign(privateKey);
+
+  return `${signingInput}.${signature.toString('base64url')}`;
+}
 
 @Controller('prueba')
 class PruebaController {
@@ -68,7 +113,8 @@ class PruebaController {
     const filas = await executeTransactionWithTenant<{ banco: string; institucion: string }[]>(
       app,
       (tx) => tx.$queryRaw<{ banco: string; institucion: string }[]>`
-        SELECT current_setting('app.banco_id', true) AS banco,
+         SELECT current_setting('app.usuario_id', true) AS usuario,
+           current_setting('app.banco_id', true) AS banco,
                current_setting('app.institucion_id', true) AS institucion`,
     );
     return filas[0];
@@ -137,6 +183,19 @@ describe.skipIf(!URL_ADMIN)('Roles por banco contra PostgreSQL (SBA-18)', () => 
   beforeAll(async () => {
     admin = new PrismaClient({ datasourceUrl: URL_ADMIN });
     app = new PrismaClient({ datasourceUrl: urlComoRolApp(URL_ADMIN as string) });
+    if (URL_API) api = new PrismaClient({ datasourceUrl: URL_API });
+    jwksServer = createServer((request, response) => {
+      if (request.url !== '/.well-known/jwks.json') {
+        response.writeHead(404).end();
+        return;
+      }
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ keys: [jwk] }));
+    });
+    await new Promise<void>((resolve) => jwksServer.listen(0, '127.0.0.1', resolve));
+    const address = jwksServer.address();
+    if (!address || typeof address === 'string') throw new Error('No se abrió el JWKS local');
+    jwksUri = `http://127.0.0.1:${address.port}/.well-known/jwks.json`;
     await limpiar();
 
     await admin.$executeRaw`INSERT INTO plataforma.red (id, nombre) VALUES (${red}::uuid, 'Red de roles')`;
@@ -149,9 +208,10 @@ describe.skipIf(!URL_ADMIN)('Roles por banco contra PostgreSQL (SBA-18)', () => 
       VALUES (${bancoA}::uuid, 'Bodega A'), (${bancoB}::uuid, 'Bodega B')`;
 
     for (const [nombre, id] of Object.entries(USUARIOS)) {
+      const email = `prueba+${id}@example.invalid`;
       await admin.$executeRaw`
-        INSERT INTO plataforma.usuario (id, auth0_sub, email, nombre, activo)
-        VALUES (${id}::uuid, ${sub(id)}, ${`${nombre}@prueba.sigba`}, ${nombre}, ${nombre !== 'inactivo'})`;
+        INSERT INTO plataforma.usuario (id, emisor, auth0_sub, email, nombre, activo)
+        VALUES (${id}::uuid, ${emisor}, ${sub(id)}, ${email}, ${nombre}, ${nombre !== 'inactivo'})`;
     }
 
     await asignar(USUARIOS.operario, 'operario_bodega', bancoA, null);
@@ -164,9 +224,12 @@ describe.skipIf(!URL_ADMIN)('Roles por banco contra PostgreSQL (SBA-18)', () => 
     await asignar(USUARIOS.institucionY, 'institucion', bancoA, instY);
 
     const modulo = await Test.createTestingModule({
-      imports: [CoreModule],
+      imports: [CoreModule, PlataformaModule, HealthModule],
       controllers: [PruebaController, RolesEnDosNivelesController],
+      providers: GUARDS_GLOBALES,
     })
+      .overrideProvider(TOKEN_VERIFIER)
+      .useValue(new Auth0TokenVerifier({ issuer: emisor, audience, jwksUri }))
       // El guard lee usuario_rol con el mismo rol sin privilegios que los
       // controladores. Con DATABASE_URL, que en CI es superusuario, se saltaría
       // RLS y super_admin entraría aunque faltara usuario_rol_propias.
@@ -174,18 +237,14 @@ describe.skipIf(!URL_ADMIN)('Roles por banco contra PostgreSQL (SBA-18)', () => 
       .useValue(app)
       .compile();
     nest = modulo.createNestApplication();
-    // Hace de guard de JWT mientras SBA-8 no exista. Con x-prueba-contexto
-    // imita a un middleware que fija contextoTenant antes que el guard.
     nest.use(
       (
-        req: { headers: Record<string, unknown>; identidad?: unknown; contextoTenant?: unknown },
+        req: { headers: Record<string, unknown>; contextoTenant?: TenantContext },
         _res: unknown,
         next: () => void,
       ) => {
-        const auth0Sub = req.headers['x-prueba-sub'];
-        if (typeof auth0Sub === 'string') req.identidad = { auth0Sub };
         if (req.headers['x-prueba-contexto']) {
-          req.contextoTenant = { bancoId: bancoA, rol: 'admin_banco' } satisfies TenantContext;
+          req.contextoTenant = { bancoId: bancoA, rol: 'admin_banco' };
         }
         next();
       },
@@ -195,15 +254,17 @@ describe.skipIf(!URL_ADMIN)('Roles por banco contra PostgreSQL (SBA-18)', () => 
 
   afterAll(async () => {
     if (nest) await nest.close();
+    if (jwksServer) await new Promise<void>((resolve) => jwksServer.close(() => resolve()));
     if (admin) {
       await limpiar();
       await admin.$disconnect();
     }
     if (app) await app.$disconnect();
+    if (api) await api.$disconnect();
   });
 
   const como = (usuario: string, banco?: string) => {
-    const cabeceras: Record<string, string> = { 'x-prueba-sub': sub(usuario) };
+    const cabeceras: Record<string, string> = { authorization: `Bearer ${token(sub(usuario))}` };
     if (banco) cabeceras['x-banco-id'] = banco;
     return cabeceras;
   };
@@ -242,6 +303,44 @@ describe.skipIf(!URL_ADMIN)('Roles por banco contra PostgreSQL (SBA-18)', () => 
       expect(propias.every((f) => f.usuario_id === USUARIOS.adminA)).toBe(true);
     });
 
+    it('resuelve identidad sin contexto con el rol de API y no expone usuario por RLS', async () => {
+      const resueltos = await app.$queryRaw<{ usuario_id: string }[]>`
+        SELECT plataforma.resolver_usuario_auth0(${emisor}, ${sub(USUARIOS.adminA)}) AS usuario_id`;
+      const lecturaDirecta = await app.$queryRaw<{ id: string }[]>`
+        SELECT id FROM plataforma.usuario WHERE id = ${USUARIOS.adminA}::uuid`;
+
+      expect(resueltos).toEqual([{ usuario_id: USUARIOS.adminA }]);
+      expect(lecturaDirecta).toEqual([]);
+    });
+
+    it.skipIf(!URL_API)('sigba_app resuelve identidad sin eludir RLS ni leer usuario', async () => {
+      const resueltos = await api!.$queryRaw<{ usuario_id: string }[]>`
+        SELECT plataforma.resolver_usuario_auth0(${emisor}, ${sub(USUARIOS.adminA)}) AS usuario_id`;
+      const lecturaDirecta = await api!.$queryRaw<{ id: string }[]>`
+        SELECT id FROM plataforma.usuario WHERE id = ${USUARIOS.adminA}::uuid`;
+      const rol = await admin.$queryRaw<{ rolsuper: boolean; rolbypassrls: boolean }[]>`
+        SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = 'sigba_app'`;
+
+      expect(resueltos).toEqual([{ usuario_id: USUARIOS.adminA }]);
+      expect(lecturaDirecta).toEqual([]);
+      expect(rol).toEqual([{ rolsuper: false, rolbypassrls: false }]);
+    });
+
+    it('el rol de ejecución no es superusuario, no elude RLS ni posee usuario', async () => {
+      const roles = await admin.$queryRaw<
+        { rolsuper: boolean; rolbypassrls: boolean; propietario: string }[]
+      >`
+        SELECT r.rolsuper, r.rolbypassrls, pg_get_userbyid(c.relowner) AS propietario
+        FROM pg_roles r CROSS JOIN pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE r.rolname = 'sigba_app'
+          AND n.nspname = 'plataforma' AND c.relname = 'usuario'`;
+
+      expect(roles).toHaveLength(1);
+      expect(roles[0]).toMatchObject({ rolsuper: false, rolbypassrls: false });
+      expect(roles[0]?.propietario).not.toBe('sigba_app');
+    });
+
     it('super_admin lee su asignación de red, que no tiene banco', async () => {
       const propias = await executeTransactionWithTenant(
         app,
@@ -260,12 +359,15 @@ describe.skipIf(!URL_ADMIN)('Roles por banco contra PostgreSQL (SBA-18)', () => 
       expect(new Set(bancos)).toEqual(new Set([bancoA]));
     });
 
-    it('una etiqueta que no es uuid en app.usuario_id no rompe la lectura', async () => {
-      // Así llaman el importador y las pruebas a runWithTenantContext.
-      await expect(bancosVisibles({ usuarioId: 'importar-codigos' })).resolves.toEqual([]);
+    it('el actor de un comando no se usa para leer asignaciones del usuario', async () => {
+      const propias = await executeTransactionWithTenant(
+        app,
+        (tx) => tx.$queryRaw<{ usuario_id: string }[]>`
+          SELECT usuario_id FROM plataforma.usuario_rol`,
+        { actor: 'importar-codigos' },
+      );
 
-      const bancos = await bancosVisibles({ bancoId: bancoA, usuarioId: 'importar-codigos' });
-      expect(new Set(bancos)).toEqual(new Set([bancoA]));
+      expect(propias).toEqual([]);
     });
 
     it('el contexto de usuario solo sirve para leer, no para escribir', async () => {
@@ -283,6 +385,34 @@ describe.skipIf(!URL_ADMIN)('Roles por banco contra PostgreSQL (SBA-18)', () => 
   describe('en la API', () => {
     it('sin identidad responde 401', async () => {
       await request(nest.getHttpServer()).post('/prueba/precios/aprobar').expect(401);
+    });
+
+    // Con un token válido, el guard resuelve la identidad con `$queryRaw` y el
+    // espía lo registra. Con uno inválido, el 401 llega antes de esa consulta.
+    it.each([
+      ['un token válido', {}, 200, true],
+      ['expirado', { exp: Math.floor(Date.now() / 1000) - 1 }, 401, false],
+      ['sin exp', { exp: undefined }, 401, false],
+      ['otra audiencia', { aud: 'https://api.otra.sigba/' }, 401, false],
+    ])('%s responde %i', async (_caso, claims, estado, consulto) => {
+      const consulta = vi.spyOn(app, '$queryRaw');
+      try {
+        await request(nest.getHttpServer())
+          .get('/prueba/contexto')
+          .set({
+            ...como(USUARIOS.adminA, bancoA),
+            authorization: `Bearer ${token(sub(USUARIOS.adminA), claims)}`,
+          })
+          .expect(estado);
+
+        expect(consulta.mock.calls.length > 0).toBe(consulto);
+      } finally {
+        consulta.mockRestore();
+      }
+    });
+
+    it('health público responde sin token', async () => {
+      await request(nest.getHttpServer()).get('/health').expect(200);
     });
 
     it('un operario_bodega que intenta aprobar un precio recibe 403', async () => {
@@ -316,7 +446,11 @@ describe.skipIf(!URL_ADMIN)('Roles por banco contra PostgreSQL (SBA-18)', () => 
         .set(como(USUARIOS.institucion, bancoA))
         .expect(200);
 
-      expect(respuesta.body).toEqual({ banco: bancoA, institucion: instX });
+      expect(respuesta.body).toEqual({
+        usuario: USUARIOS.institucion,
+        banco: bancoA,
+        institucion: instX,
+      });
     });
 
     it('un usuario institucion no ve las asignaciones de otra institución del banco', async () => {

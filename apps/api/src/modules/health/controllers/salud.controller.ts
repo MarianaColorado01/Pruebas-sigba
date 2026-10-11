@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { Publico } from '../../../core/index.js';
 import { SaludService } from '../services/salud.service.js';
 import type { EstadoDeSaludDto } from '../dto/estadoDeSalud.dto.js';
 
@@ -7,6 +8,7 @@ import type { EstadoDeSaludDto } from '../dto/estadoDeSalud.dto.js';
  * negocio: esas viven en `services/` y se prueban sin levantar el servidor.
  */
 @Controller('health')
+@Publico()
 export class SaludController {
   constructor(private readonly salud: SaludService) {}
 
