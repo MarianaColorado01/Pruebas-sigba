@@ -387,6 +387,23 @@ describe.skipIf(!URL_ADMIN)('Roles por banco contra PostgreSQL (SBA-18)', () => 
       await request(nest.getHttpServer()).post('/prueba/precios/aprobar').expect(401);
     });
 
+    it('parámetros exige token y rol admin_banco', async () => {
+      await request(nest.getHttpServer()).get('/parametros').expect(401);
+      await request(nest.getHttpServer())
+        .get('/parametros')
+        .set(como(USUARIOS.operario, bancoA))
+        .expect(403);
+      await request(nest.getHttpServer())
+        .get('/parametros')
+        .set(como(USUARIOS.adminA, bancoA))
+        .expect(200);
+      await request(nest.getHttpServer())
+        .put('/parametros/aporte_solidario_pct')
+        .set(como(USUARIOS.adminA, bancoA))
+        .send({ valor: 15 })
+        .expect(400);
+    });
+
     // Con un token válido, el guard resuelve la identidad con `$queryRaw` y el
     // espía lo registra. Con uno inválido, el 401 llega antes de esa consulta.
     it.each([

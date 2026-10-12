@@ -71,6 +71,35 @@ describe.skipIf(!URL_ADMIN)('Rol de la API sigba_app (ADR-07, 8.1)', () => {
     }
   });
 
+  it('parametro_banco solo permite actualizar fecha_fin', async () => {
+    const [privilegios] = await admin.$queryRaw<
+      {
+        select: boolean;
+        insert: boolean;
+        update: boolean;
+        delete: boolean;
+        actualizarFechaFin: boolean;
+        actualizarValor: boolean;
+      }[]
+    >`
+      SELECT
+        has_table_privilege('sigba_app', 'plataforma.parametro_banco', 'SELECT') AS "select",
+        has_table_privilege('sigba_app', 'plataforma.parametro_banco', 'INSERT') AS "insert",
+        has_table_privilege('sigba_app', 'plataforma.parametro_banco', 'UPDATE') AS "update",
+        has_table_privilege('sigba_app', 'plataforma.parametro_banco', 'DELETE') AS "delete",
+        has_column_privilege('sigba_app', 'plataforma.parametro_banco', 'fecha_fin', 'UPDATE') AS "actualizarFechaFin",
+        has_column_privilege('sigba_app', 'plataforma.parametro_banco', 'valor', 'UPDATE') AS "actualizarValor"`;
+
+    expect(privilegios).toEqual({
+      select: true,
+      insert: true,
+      update: false,
+      delete: false,
+      actualizarFechaFin: true,
+      actualizarValor: false,
+    });
+  });
+
   it('aplicar el script otra vez no falla, no cambia los privilegios ni quita el LOGIN', async () => {
     const privilegios = () => admin.$queryRaw<{ tabla: string; privilegios: string }[]>`
         SELECT format('%I.%I', n.nspname, c.relname) AS tabla,

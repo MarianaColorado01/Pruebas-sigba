@@ -1,5 +1,9 @@
 import { Module } from '@nestjs/common';
 import { RESOLUTOR_DE_IDENTIDAD } from '../../core/index.js';
+import { ParametrosLectura, ParametrosService } from './services/parametros.service.js';
+import { ParametrosPrismaRepositorio } from './repositories/parametros.prisma.repositorio.js';
+import { ParametrosRepositorio } from './services/parametros.repositorio.js';
+import { ParametrosController } from './controllers/parametros.controller.js';
 import { UsuariosPrismaRepositorio } from './repositories/usuarios.prisma.repositorio.js';
 import { UsuariosRepositorio } from './services/usuario.js';
 import { UsuariosService } from './services/usuarios.service.js';
@@ -13,12 +17,15 @@ import { UsuariosService } from './services/usuarios.service.js';
  */
 @Module({
   imports: [],
-  controllers: [],
+  controllers: [ParametrosController],
   providers: [
     UsuariosService,
     { provide: UsuariosRepositorio, useClass: UsuariosPrismaRepositorio },
+    ParametrosService,
+    { provide: ParametrosRepositorio, useClass: ParametrosPrismaRepositorio },
+    { provide: ParametrosLectura, useExisting: ParametrosService },
     { provide: RESOLUTOR_DE_IDENTIDAD, useExisting: UsuariosService },
   ],
-  exports: [RESOLUTOR_DE_IDENTIDAD],
+  exports: [RESOLUTOR_DE_IDENTIDAD, ParametrosLectura],
 })
 export class PlataformaModule {}
