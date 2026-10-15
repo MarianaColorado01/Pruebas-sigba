@@ -54,3 +54,77 @@ describe('AuditService', () => {
     expect(tx.$queryRaw).not.toHaveBeenCalled();
   });
 });
+
+describe('AuditService.registrarLectura', () => {
+  const conjunto = 'beneficiarios_de_institucion:33333333-3333-3333-3333-333333333333';
+
+  it('registra la acción leer con el conjunto, la finalidad y la cantidad de filas', async () => {
+    const servicio = new AuditService();
+    const tx = { $queryRaw: vi.fn().mockResolvedValue([]) };
+
+    await servicio.registrarLectura(tx as never, {
+      entidad: 'beneficiario',
+      conjunto,
+      cantidad: 12,
+      finalidad: 'entrega_de_mercado',
+    });
+
+    expect(tx.$queryRaw).toHaveBeenCalledOnce();
+    expect(tx.$queryRaw.mock.calls[0]).toEqual(
+      expect.arrayContaining([
+        'leer',
+        'beneficiario',
+        conjunto,
+        'entrega_de_mercado',
+        JSON.stringify({ cantidad: 12 }),
+      ]),
+    );
+  });
+
+  it.each([
+    ['un nombre', 'beneficiarios:Ana Gómez'],
+    ['un documento', 'beneficiarios_por_documento:1088123456'],
+    ['texto de búsqueda', 'beneficiarios?texto=ana'],
+    ['un id que no es UUID', 'beneficiarios_de_institucion:42'],
+  ])('rechaza un conjunto con %s', async (_caso, conjuntoInvalido) => {
+    const servicio = new AuditService();
+    const tx = { $queryRaw: vi.fn() };
+
+    await expect(
+      servicio.registrarLectura(tx as never, {
+        entidad: 'beneficiario',
+        conjunto: conjuntoInvalido,
+        cantidad: 1,
+        finalidad: 'entrega_de_mercado',
+      }),
+    ).rejects.toThrow(/conjunto/i);
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('rechaza entidad o finalidad que no sean códigos', async () => {
+    const servicio = new AuditService();
+    const tx = { $queryRaw: vi.fn() };
+    const base = { entidad: 'beneficiario', conjunto, cantidad: 1, finalidad: 'entrega' };
+
+    await expect(
+      servicio.registrarLectura(tx as never, { ...base, entidad: 'Beneficiario Ana' }),
+    ).rejects.toThrow(/entidad/i);
+    await expect(
+      servicio.registrarLectura(tx as never, { ...base, finalidad: 'Llamar a Ana al 310' }),
+    ).rejects.toThrow(/finalidad/i);
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('rechaza una cantidad negativa o fraccionaria', async () => {
+    const servicio = new AuditService();
+    const tx = { $queryRaw: vi.fn() };
+    const base = { entidad: 'beneficiario', conjunto, finalidad: 'entrega' };
+
+    for (const cantidad of [-1, 1.5]) {
+      await expect(servicio.registrarLectura(tx as never, { ...base, cantidad })).rejects.toThrow(
+        /cantidad/i,
+      );
+    }
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
+  });
+});

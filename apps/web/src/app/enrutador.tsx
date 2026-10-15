@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router';
 import { CatalogoPage } from '../features/inventario/CatalogoPage.tsx';
 import { StockPage } from '../features/inventario/StockPage.tsx';
+import { PantallaDeAuditoria } from '../features/plataforma/auditoria/PantallaDeAuditoria.tsx';
 import { Inicio } from './Inicio.tsx';
 
 /**
@@ -19,5 +20,10 @@ export const enrutador = createBrowserRouter([
   {
     path: '/stock',
     element: <StockPage />,
+  },
+  // Plataforma · auditoría (SBA-51)
+  {
+    path: '/plataforma/auditoria',
+    element: <PantallaDeAuditoria />,
   },
 ]);

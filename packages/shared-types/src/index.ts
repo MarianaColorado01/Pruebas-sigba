@@ -46,3 +46,44 @@ export const CABECERAS = {
   banco: 'x-banco-id',
   institucion: 'x-institucion-id',
 } as const;
+
+/**
+ * Acciones que registra `core.auditoria` (RNF-04). `leer` es una consulta de
+ * datos personales: guarda qué conjunto y cuántas filas, nunca su contenido
+ * (Arquitectura 8.6).
+ */
+export const ACCIONES_DE_AUDITORIA = ['crear', 'actualizar', 'eliminar', 'leer'] as const;
+
+export type AccionDeAuditoria = (typeof ACCIONES_DE_AUDITORIA)[number];
+
+/** Quién actuó: una persona con sesión o una tarea del sistema. */
+export const TIPOS_DE_ACTOR = ['usuario', 'sistema'] as const;
+
+export type TipoDeActor = (typeof TIPOS_DE_ACTOR)[number];
+
+/** Un registro de `GET /api/v1/auditoria` (SBA-51). */
+export interface RegistroDeAuditoria {
+  id: string;
+  /** Instante ISO 8601. */
+  ocurridoEn: string;
+  tipoActor: TipoDeActor;
+  /** Usuario de SIGBA; `null` si actuó el sistema. */
+  actorId: string | null;
+  /** `null` si actuó el sistema o la persona ya no tiene asignación en el banco. */
+  actorNombre: string | null;
+  /** Tarea del sistema, por ejemplo `sistema:retencion`; `null` si actuó un usuario. */
+  actorEtiqueta: string | null;
+  accion: AccionDeAuditoria;
+  entidad: string;
+  /** Id de la fila, o el conjunto leído en una lectura. */
+  entidadId: string;
+  resultado: string;
+  finalidad: string | null;
+  detalle: { camposModificados?: string[]; version?: number; cantidad?: number } | null;
+}
+
+export interface PaginaDeAuditoria {
+  registros: RegistroDeAuditoria[];
+  /** Se manda como `cursor` para pedir los registros anteriores; `null` al final. */
+  siguienteCursor: string | null;
+}

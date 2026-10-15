@@ -49,6 +49,10 @@ export async function pedir<T>(
   const respuesta = await llamar(ruta, opciones, accessToken);
   // Sin If-None-Match la API no responde 304; si lo hiciera, no hay cuerpo que leer.
   if (respuesta.status === 304) throw new ErrorDeApi(304, 'La API respondió 304 sin ETag');
+  // Un exportable llega como CSV; todo lo demás, como JSON.
+  if (respuesta.headers.get('content-type')?.startsWith('text/csv')) {
+    return (await respuesta.text()) as T;
+  }
   return (await respuesta.json()) as T;
 }
 
