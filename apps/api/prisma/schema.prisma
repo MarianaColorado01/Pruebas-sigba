@@ -387,6 +387,8 @@ model Movimiento {
 
   lote    Lote              @relation(fields: [bancoId, loteId, referenciaId], references: [bancoId, id, referenciaId], onUpdate: Restrict)
   detalle RecepcionDetalle?
+  baja    Baja?
+  ajuste  Ajuste?
 
   @@id([bancoId, id])
   @@index([bancoId, comandoId])
@@ -461,6 +463,48 @@ model Precio {
 
   @@index([bancoId, referenciaId, vigenteDesde])
   @@map("precio")
+  @@schema("inventario")
+}
+
+enum MotivoBaja {
+  vencido
+  no_apto
+  roto
+  perdida
+
+  @@map("motivo_baja")
+  @@schema("inventario")
+}
+
+/// El motivo de una baja (SBA-42). Cantidad, lote y bodega se leen de su
+/// movimiento. Un trigger la deja sin UPDATE ni DELETE (ADR-08).
+model Baja {
+  bancoId      String     @map("banco_id") @db.Uuid
+  movimientoId String     @map("movimiento_id") @db.Uuid
+  motivo       MotivoBaja
+  creadoPor    String     @map("creado_por") @db.VarChar(100)
+  creadoEn     DateTime   @default(now()) @map("creado_en") @db.Timestamptz
+
+  movimiento Movimiento @relation(fields: [bancoId, movimientoId], references: [bancoId, id], onUpdate: Restrict)
+
+  @@id([bancoId, movimientoId])
+  @@map("baja")
+  @@schema("inventario")
+}
+
+/// El motivo de un ajuste de conteo (SBA-42), texto libre obligatorio. Un
+/// trigger lo deja sin UPDATE ni DELETE (ADR-08).
+model Ajuste {
+  bancoId      String   @map("banco_id") @db.Uuid
+  movimientoId String   @map("movimiento_id") @db.Uuid
+  motivo       String   @db.VarChar(500)
+  creadoPor    String   @map("creado_por") @db.VarChar(100)
+  creadoEn     DateTime @default(now()) @map("creado_en") @db.Timestamptz
+
+  movimiento Movimiento @relation(fields: [bancoId, movimientoId], references: [bancoId, id], onUpdate: Restrict)
+
+  @@id([bancoId, movimientoId])
+  @@map("ajuste")
   @@schema("inventario")
 }
 

@@ -104,6 +104,9 @@ GRANT SELECT ON inventario.saldo TO sigba_app;
 -- Maestro de precios (SBA-39): el UPDATE aprueba o acorta la vigencia; el
 -- trigger de la tabla rechaza cualquier otro cambio.
 GRANT SELECT, INSERT, UPDATE ON inventario.precio TO sigba_app;
+-- El motivo de cada baja y cada ajuste (SBA-42): append-only, como su movimiento.
+GRANT SELECT, INSERT ON inventario.baja TO sigba_app;
+GRANT SELECT, INSERT ON inventario.ajuste TO sigba_app;
 
 -- beneficiarios
 GRANT SELECT, INSERT, UPDATE ON beneficiarios.tipo_poblacion TO sigba_app;
