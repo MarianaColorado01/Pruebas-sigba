@@ -98,6 +98,9 @@ GRANT SELECT, INSERT ON inventario.lote TO sigba_app;
 GRANT SELECT, INSERT ON inventario.recepcion_detalle TO sigba_app;
 -- El libro es append-only (ADR-08).
 GRANT SELECT, INSERT ON inventario.movimiento TO sigba_app;
+-- El saldo se deriva del libro (SBA-35): lo escribe el trigger
+-- inventario.sumar_al_saldo con cada movimiento; la API solo lo lee.
+GRANT SELECT ON inventario.saldo TO sigba_app;
 
 -- beneficiarios
 GRANT SELECT, INSERT, UPDATE ON beneficiarios.tipo_poblacion TO sigba_app;
@@ -119,5 +122,8 @@ GRANT EXECUTE ON FUNCTION core.reclamar_comando(uuid, smallint, text, text, uuid
 
 -- Outbox transaccional (SBA-30).
 GRANT EXECUTE ON FUNCTION core.emitir_evento(text, smallint, jsonb) TO sigba_app;
+
+-- inventario.sumar_al_saldo (SBA-35) no lleva GRANT: la ejecuta el trigger
+-- del libro, y Postgres no revisa EXECUTE cuando dispara un trigger.
 
 COMMIT;

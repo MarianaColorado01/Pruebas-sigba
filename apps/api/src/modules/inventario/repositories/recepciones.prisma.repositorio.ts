@@ -8,6 +8,7 @@ import {
   PrismaService,
 } from '../../../core/index.js';
 import { contexto } from './contexto-de-tenant.js';
+import { escribirEnLibro } from './libro.js';
 import {
   type CargaDeRecepcion,
   type DatosDeRecepcion,
@@ -59,7 +60,12 @@ export class RecepcionesPrismaRepositorio extends RecepcionesRepositorio {
     super();
   }
 
-  async registrar({ comandoId, carga, kilos }: DatosDeRecepcion): Promise<RecepcionRegistrada> {
+  async registrar({
+    comandoId,
+    carga,
+    kilos,
+    equivalencias,
+  }: DatosDeRecepcion): Promise<RecepcionRegistrada> {
     const { bancoId, actor } = contexto();
     if (!actor) throw new Error('Recepción sin actor en el contexto de tenant.');
     const { detalles, ...cabecera } = carga;
@@ -68,6 +74,7 @@ export class RecepcionesPrismaRepositorio extends RecepcionesRepositorio {
     const filas = detalles.map((detalle, i) => ({
       ...detalle,
       kilos: kilos[i] as string,
+      equivalenciaKg: equivalencias[i] as string,
       loteId: randomUUID(),
     }));
 
@@ -97,11 +104,13 @@ export class RecepcionesPrismaRepositorio extends RecepcionesRepositorio {
             referenciaId: f.referenciaId,
             codigo: f.lote,
             vencimiento: f.vencimiento ? new Date(`${f.vencimiento}T00:00:00Z`) : null,
+            equivalenciaKg: f.equivalenciaKg,
             creadoPor: actor,
           })),
         });
-        await tx.movimiento.createMany({
-          data: filas.map((f) => ({
+        await escribirEnLibro(
+          tx,
+          filas.map((f) => ({
             id: f.movimientoId,
             bancoId,
             comandoId,
@@ -113,7 +122,7 @@ export class RecepcionesPrismaRepositorio extends RecepcionesRepositorio {
             kilos: f.kilos,
             creadoPor: actor,
           })),
-        });
+        );
         // Sin valoración: la columna nace pendiente, nunca en cero (ADR-13).
         await tx.recepcionDetalle.createMany({
           data: filas.map((f, orden) => ({

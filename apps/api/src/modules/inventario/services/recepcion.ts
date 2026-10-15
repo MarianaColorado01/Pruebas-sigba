@@ -84,11 +84,16 @@ export interface Recepcion {
   detalles: DetalleDeRecepcion[];
 }
 
-/** Lo que el adaptador recibe: la carga y los kilos de cada fila, en su orden. */
+/**
+ * Lo que el adaptador recibe: la carga y, por fila y en su orden, los kilos y
+ * la equivalencia con que se calcularon. La equivalencia queda congelada en el
+ * lote: si el catálogo la corrige después, el lote sigue pesando lo que pesó.
+ */
 export interface DatosDeRecepcion {
   comandoId: string;
   carga: CargaDeRecepcion;
   kilos: string[];
+  equivalencias: string[];
 }
 
 export interface RecepcionRegistrada {

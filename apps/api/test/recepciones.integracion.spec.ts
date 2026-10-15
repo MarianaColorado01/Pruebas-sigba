@@ -85,7 +85,7 @@ describe.skipIf(!URL_ADMIN)('Recepción contra PostgreSQL (SBA-24)', () => {
     const enBancos = `banco_id IN ('${bancoA}', '${bancoB}')`;
     await admin.$transaction([
       admin.$executeRawUnsafe(`SET LOCAL session_replication_role = replica`),
-      ...[...TABLAS, 'referencia', 'producto', 'categoria', 'donante'].map((tabla) =>
+      ...['saldo', ...TABLAS, 'referencia', 'producto', 'categoria', 'donante'].map((tabla) =>
         admin.$executeRawUnsafe(`DELETE FROM inventario.${tabla} WHERE ${enBancos}`),
       ),
       admin.$executeRawUnsafe(`DELETE FROM core.comando_procesado WHERE ${enBancos}`),
@@ -161,6 +161,7 @@ describe.skipIf(!URL_ADMIN)('Recepción contra PostgreSQL (SBA-24)', () => {
         })),
       },
       kilos: cmd.detalles.map(() => '1'),
+      equivalencias: cmd.detalles.map(() => '1'),
     };
   }
 
@@ -476,8 +477,9 @@ describe.skipIf(!URL_ADMIN)('Recepción contra PostgreSQL (SBA-24)', () => {
       const inserciones = {
         recepcion: `INSERT INTO inventario.recepcion (banco_id, donante_id, origen, bodega_id, creado_por)
           VALUES (${deA}, ${otro()}, 'propia', ${otro()}, 'intruso')`,
-        lote: `INSERT INTO inventario.lote (banco_id, recepcion_id, referencia_id, vencimiento, creado_por)
-          VALUES (${deA}, ${otro()}, ${otro()}, '2027-03-31', 'intruso')`,
+        lote: `INSERT INTO inventario.lote
+          (banco_id, recepcion_id, referencia_id, vencimiento, equivalencia_kg, creado_por)
+          VALUES (${deA}, ${otro()}, ${otro()}, '2027-03-31', 1, 'intruso')`,
         movimiento: `INSERT INTO inventario.movimiento
           (id, banco_id, comando_id, tipo, referencia_id, lote_id, bodega_id, cantidad, kilos, creado_por)
           VALUES (${otro()}, ${deA}, ${otro()}, 'entrada', ${otro()}, ${otro()}, ${otro()}, 1, 1, 'intruso')`,

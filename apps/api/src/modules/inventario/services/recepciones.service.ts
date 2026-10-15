@@ -53,20 +53,25 @@ export class RecepcionesService {
     const comandoId = uuid(comando.comandoId, 'El comando');
     const carga = cargaValida(comando);
 
-    let kilosPorFila: string[];
+    let equivalencias: string[];
     try {
-      kilosPorFila = await this.kilos(carga);
+      equivalencias = await this.equivalencias(carga);
     } catch (error) {
       if (!(error instanceof NotFoundException)) throw error;
       const previa = await this.repositorio.repetida(comandoId, carga);
       if (previa) return previa;
       throw error;
     }
-    return this.repositorio.registrar({ comandoId, carga, kilos: kilosPorFila });
+    return this.repositorio.registrar({
+      comandoId,
+      carga,
+      kilos: carga.detalles.map((d, i) => kilos(d.cantidad, equivalencias[i] as string)),
+      equivalencias,
+    });
   }
 
-  /** Valida donante, bodega y referencias activos y calcula los kilos de cada fila. */
-  private async kilos(carga: CargaDeRecepcion): Promise<string[]> {
+  /** Valida donante, bodega y referencias activos; devuelve la equivalencia de cada fila. */
+  private async equivalencias(carga: CargaDeRecepcion): Promise<string[]> {
     await this.donantes.obtenerActivo(carga.donanteId);
     // Sin FK a plataforma.bodega (ADR-05): la valida su dueño, con RLS por banco.
     await this.bodegas.obtenerActiva(carga.bodegaId);
@@ -82,7 +87,7 @@ export class RecepcionesService {
       if (!equivalenciaKg) {
         throw new NotFoundException(`Fila ${i + 1}: no existe esa referencia o está desactivada.`);
       }
-      return kilos(detalle.cantidad, equivalenciaKg);
+      return equivalenciaKg;
     });
   }
 }

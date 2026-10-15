@@ -304,6 +304,7 @@ describe('RecepcionesService', () => {
           ],
         },
         kilos: ['1.25'],
+        equivalencias: ['0.5'],
       });
     });
   });

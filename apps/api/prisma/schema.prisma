@@ -276,8 +276,14 @@ enum EstadoValoracion {
   @@schema("inventario")
 }
 
+/// El signo de la cantidad lo fija el tipo: entrada suma, salida y baja
+/// restan, ajuste y traslado van en los dos sentidos (SBA-35).
 enum TipoMovimiento {
   entrada
+  salida
+  traslado
+  baja
+  ajuste
 
   @@map("tipo_movimiento")
   @@schema("inventario")
@@ -307,20 +313,24 @@ model Recepcion {
 /// Lo recibido de una referencia en una recepción, con su vencimiento. El saldo
 /// se lleva por banco, bodega y lote (Arquitectura 8.3). Sin UPDATE ni DELETE.
 model Lote {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  bancoId      String   @map("banco_id") @db.Uuid
-  recepcionId  String   @map("recepcion_id") @db.Uuid
-  referenciaId String   @map("referencia_id") @db.Uuid
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoId        String    @map("banco_id") @db.Uuid
+  recepcionId    String    @map("recepcion_id") @db.Uuid
+  referenciaId   String    @map("referencia_id") @db.Uuid
   /// El lote impreso en el empaque, si lo trae.
-  codigo       String?  @db.VarChar(50)
+  codigo         String?   @db.VarChar(50)
   /// Nulo si el producto no trae fecha, como el aseo y los no alimentos.
-  vencimiento  DateTime? @db.Date
-  creadoPor    String   @map("creado_por") @db.VarChar(100)
-  creadoEn     DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  vencimiento    DateTime? @db.Date
+  /// Kilos por unidad al recibir, congelados: el saldo y todo movimiento del
+  /// lote pesan con esta y no con la que tenga hoy la referencia (SBA-35).
+  equivalenciaKg Decimal   @map("equivalencia_kg") @db.Decimal(10, 3)
+  creadoPor      String    @map("creado_por") @db.VarChar(100)
+  creadoEn       DateTime  @default(now()) @map("creado_en") @db.Timestamptz
 
   recepcion   Recepcion    @relation(fields: [bancoId, recepcionId], references: [bancoId, id], onUpdate: Restrict)
   referencia  Referencia   @relation(fields: [bancoId, referenciaId], references: [bancoId, id], onUpdate: Restrict)
   movimientos Movimiento[]
+  saldos      Saldo[]
 
   // Para que el movimiento no nombre una referencia distinta a la del lote.
   @@unique([bancoId, id, referenciaId])
@@ -368,6 +378,7 @@ model Movimiento {
   referenciaId String         @map("referencia_id") @db.Uuid
   loteId       String         @map("lote_id") @db.Uuid
   bodegaId     String         @map("bodega_id") @db.Uuid
+  /// Con signo: positiva suma al saldo, negativa resta.
   cantidad     Decimal        @db.Decimal(10, 3)
   kilos        Decimal        @db.Decimal(20, 6)
   creadoPor    String         @map("creado_por") @db.VarChar(100)
@@ -379,6 +390,25 @@ model Movimiento {
   @@id([bancoId, id])
   @@index([bancoId, comandoId])
   @@map("movimiento")
+  @@schema("inventario")
+}
+
+/// Lo que hay de un lote en una bodega: la suma de sus movimientos. Solo lo
+/// escribe el trigger `movimiento_suma_al_saldo`; sigba_app lo lee (SBA-35).
+model Saldo {
+  bancoId       String   @map("banco_id") @db.Uuid
+  bodegaId      String   @map("bodega_id") @db.Uuid
+  loteId        String   @map("lote_id") @db.Uuid
+  referenciaId  String   @map("referencia_id") @db.Uuid
+  cantidad      Decimal  @db.Decimal(14, 3)
+  kilos         Decimal  @db.Decimal(24, 6)
+  actualizadoEn DateTime @default(now()) @map("actualizado_en") @db.Timestamptz
+
+  lote Lote @relation(fields: [bancoId, loteId, referenciaId], references: [bancoId, id, referenciaId], onUpdate: Restrict)
+
+  @@id([bancoId, bodegaId, loteId])
+  @@index([bancoId, referenciaId])
+  @@map("saldo")
   @@schema("inventario")
 }
 
