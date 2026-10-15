@@ -1,34 +1,39 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, type RouteObject } from 'react-router';
 import { CatalogoPage } from '../features/inventario/CatalogoPage.tsx';
 import { StockPage } from '../features/inventario/StockPage.tsx';
 import { PantallaBancos } from '../features/plataforma/PantallaBancos.tsx';
 import { PantallaBodegas } from '../features/plataforma/PantallaBodegas.tsx';
 import { PantallaDeAuditoria } from '../features/plataforma/auditoria/PantallaDeAuditoria.tsx';
 import { Inicio } from './Inicio.tsx';
+import { Pendiente } from './Pendiente.tsx';
+import { SesionProvider } from './SesionProvider.tsx';
+import { Shell } from './Shell.tsx';
 
 /**
  * Rutas de la PWA. Cada feature registra las suyas aquí
  * (Arquitectura 5.3: `app/` reúne router, layout, providers y sync).
+ *
+ * Las hijas de la ruta raíz exigen banco elegido. Una ruta que deba abrirse
+ * sin asignación, como aceptar una invitación, va como hermana de esa raíz.
  */
-export const enrutador = createBrowserRouter([
+export const rutas: RouteObject[] = [
   {
-    path: '/',
-    element: <Inicio />,
+    element: (
+      <SesionProvider>
+        <Shell />
+      </SesionProvider>
+    ),
+    children: [
+      { index: true, element: <Inicio /> },
+      { path: 'catalogo', element: <CatalogoPage /> },
+      { path: 'stock', element: <StockPage /> },
+      { path: 'plataforma/bodegas', element: <PantallaBodegas /> },
+      { path: 'plataforma/usuarios', element: <Pendiente titulo="Usuarios" /> },
+      { path: 'plataforma/bancos', element: <PantallaBancos /> },
+      // Plataforma · auditoría (SBA-51)
+      { path: 'plataforma/auditoria', element: <PantallaDeAuditoria /> },
+    ],
   },
-  {
-    path: '/catalogo',
-    element: <CatalogoPage />,
-  },
-  // plataforma: bancos y bodegas (SBA-19)
-  { path: '/bancos', element: <PantallaBancos /> },
-  { path: '/bodegas', element: <PantallaBodegas /> },
-  {
-    path: '/stock',
-    element: <StockPage />,
-  },
-  // Plataforma · auditoría (SBA-51)
-  {
-    path: '/plataforma/auditoria',
-    element: <PantallaDeAuditoria />,
-  },
-]);
+];
+
+export const enrutador = createBrowserRouter(rutas);

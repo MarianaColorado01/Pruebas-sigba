@@ -15,6 +15,7 @@ export {
 } from './auth/resolutor-de-identidad.js';
 export { TOKEN_VERIFIER, type TokenVerifier } from './auth/token-verifier.js';
 export { Publico } from './auth/publico.decorator.js';
+export { Autenticado } from './auth/autenticado.decorator.js';
 export { GUARDS_GLOBALES } from './guards-globales.js';
 export * from './autorizacion/index.js';
 export * from './database/index.js';

@@ -8,7 +8,7 @@ export function Inicio() {
   const conectado = useEstadoDeConexion();
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 p-6">
+    <section className="mx-auto flex max-w-md flex-col gap-6 px-4 py-6 md:py-10">
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">SIGBA</h1>
         <p className="text-muted-foreground">
@@ -47,6 +47,6 @@ export function Inicio() {
       <Link to="/stock" className={buttonVariants({ variant: 'outline', className: 'self-start' })}>
         Consultar stock
       </Link>
-    </main>
+    </section>
   );
 }

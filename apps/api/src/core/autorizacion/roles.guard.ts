@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { CABECERAS, type Rol } from '@sigba/shared-types';
+import { SOLO_AUTENTICADO } from '../auth/autenticado.decorator.js';
 import { RUTA_PUBLICA } from '../auth/publico.decorator.js';
 import type { IdentidadDeAutenticacion } from '../auth/resolutor-de-identidad.js';
 import type { TenantContext } from '../database/tenant-context.js';
@@ -36,6 +37,9 @@ function cabecera(peticion: PeticionAutorizada, nombre: string): string | undefi
  * El banco de la cabecera no se cree: solo selecciona entre las asignaciones
  * del propio usuario. Pedir un banco donde no tiene rol da 403, igual que no
  * tener el rol.
+ *
+ * Una ruta con `@Autenticado()` no pide asignación: solo deja el usuario, si
+ * existe, en el contexto.
  */
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -46,23 +50,22 @@ export class RolesGuard implements CanActivate {
 
   async canActivate(contexto: ExecutionContext): Promise<boolean> {
     const peticion = contexto.switchToHttp().getRequest<PeticionAutorizada>();
+    const destinos = [contexto.getHandler(), contexto.getClass()];
 
-    if (
-      this.reflector.getAllAndOverride<boolean>(RUTA_PUBLICA, [
-        contexto.getHandler(),
-        contexto.getClass(),
-      ])
-    ) {
+    if (this.reflector.getAllAndOverride<boolean>(RUTA_PUBLICA, destinos)) return true;
+
+    if (!peticion.identidad) throw new UnauthorizedException();
+
+    if (this.reflector.getAllAndOverride<boolean>(SOLO_AUTENTICADO, destinos)) {
+      const { auth0Sub, emisor } = peticion.identidad;
+      const usuario = await this.asignaciones.usuarioDe(auth0Sub, emisor);
+      peticion.contextoTenant = usuario ? { usuarioId: usuario.usuarioId } : {};
       return true;
     }
 
     const permitidos =
-      this.reflector.getAllAndOverride<readonly Rol[] | undefined>(ROLES_PERMITIDOS, [
-        contexto.getHandler(),
-        contexto.getClass(),
-      ]) ?? [];
-
-    if (!peticion.identidad) throw new UnauthorizedException();
+      this.reflector.getAllAndOverride<readonly Rol[] | undefined>(ROLES_PERMITIDOS, destinos) ??
+      [];
 
     const usuario = await this.asignaciones.deIdentidad(
       peticion.identidad.auth0Sub,

@@ -3,7 +3,8 @@ import { PATH_METADATA } from '@nestjs/common/constants';
 import { DiscoveryModule, DiscoveryService, MetadataScanner } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { describe, expect, it } from 'vitest';
-import { Publico, Roles } from '../src/core/index.js';
+import { Autenticado, Publico, Roles } from '../src/core/index.js';
+import { SOLO_AUTENTICADO } from '../src/core/auth/autenticado.decorator.js';
 import { RUTA_PUBLICA } from '../src/core/auth/publico.decorator.js';
 import { ROLES_PERMITIDOS } from '../src/core/autorizacion/roles.guard.js';
 import { AppModule } from '../src/app.module.js';
@@ -12,13 +13,16 @@ const marca = (clave: string, controlador: object, handler: object): boolean =>
   Boolean(Reflect.getMetadata(clave, handler) ?? Reflect.getMetadata(clave, controlador));
 
 /**
- * Cada ruta lleva `@Roles()` o `@Publico()`, nunca las dos: con ambas, la
- * marca pública gana en los guards y los roles quedan de adorno.
+ * Cada ruta lleva exactamente uno de `@Roles()`, `@Publico()` o
+ * `@Autenticado()`. Con dos, el guard atiende al más permisivo y el otro queda
+ * de adorno: `@Publico()` deja sin efecto a los demás y `@Autenticado()` a
+ * `@Roles()`.
  */
 function politicaUnica(controlador: object, handler: object): boolean {
-  return (
-    marca(ROLES_PERMITIDOS, controlador, handler) !== marca(RUTA_PUBLICA, controlador, handler)
+  const marcas = [ROLES_PERMITIDOS, RUTA_PUBLICA, SOLO_AUTENTICADO].filter((clave) =>
+    marca(clave, controlador, handler),
   );
+  return marcas.length === 1;
 }
 
 @Controller('sin-politica')
@@ -39,8 +43,18 @@ class ControladorConAmbas {
   }
 }
 
+@Roles('admin_banco')
+@Controller('roles-y-autenticado')
+class ControladorConRolesYAutenticado {
+  @Autenticado()
+  @Get()
+  consultar() {
+    return {};
+  }
+}
+
 describe('cobertura de autorización de rutas registradas', () => {
-  it('detecta una ruta sin @Roles() ni @Publico()', () => {
+  it('detecta una ruta sin @Roles(), @Publico() ni @Autenticado()', () => {
     const handler = ControladorSinPolitica.prototype.consultar;
 
     expect(Reflect.getMetadata(PATH_METADATA, handler)).toBeDefined();
@@ -51,7 +65,16 @@ describe('cobertura de autorización de rutas registradas', () => {
     expect(politicaUnica(ControladorConAmbas, ControladorConAmbas.prototype.consultar)).toBe(false);
   });
 
-  it('cada ruta de AppModule tiene @Roles() o @Publico(), y solo uno', async () => {
+  it('detecta una ruta con @Roles() y @Autenticado() a la vez', () => {
+    expect(
+      politicaUnica(
+        ControladorConRolesYAutenticado,
+        ControladorConRolesYAutenticado.prototype.consultar,
+      ),
+    ).toBe(false);
+  });
+
+  it('cada ruta de AppModule tiene uno de @Roles(), @Publico() o @Autenticado()', async () => {
     const testingModule = await Test.createTestingModule({
       imports: [DiscoveryModule, AppModule],
     }).compile();

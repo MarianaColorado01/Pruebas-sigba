@@ -15,6 +15,7 @@ importa un módulo. El lint lo comprueba y falla si se invierte (ADR-01).
   parámetro opcional (SBA-64), ver abajo.
 - Guard JWT, puerto `TokenVerifier` y adaptador Auth0: implementado.
 - Roles por banco, `@Roles()` y contexto de petición: implementado en SBA-18.
+- `@Autenticado()` para rutas sin asignación: SBA-19.
 - `AuditService` y auditoría base: SBA-21.
 - `IdempotenciaService` y `core.comando_procesado`: SBA-69. Ver
   [docs/arquitectura/idempotencia-de-comandos.md](../../../../docs/arquitectura/idempotencia-de-comandos.md).
@@ -22,6 +23,24 @@ importa un módulo. El lint lo comprueba y falla si se invierte (ADR-01).
   Los contratos permanecen en borrador hasta la aprobación de arquitectura y de los equipos
   consumidores.
 - Puertos de almacenamiento, correo, visión y precios: SBA-13 y SBA-54.
+
+## Quién entra a cada ruta
+
+Toda ruta lleva exactamente uno de estos tres decoradores;
+`test/cobertura-rutas.e2e-spec.ts` falla si falta o sobra uno.
+
+| Decorador        | Pide                               | Contexto de tenant                   |
+| ---------------- | ---------------------------------- | ------------------------------------ |
+| `@Roles(...)`    | JWT y una asignación de esos roles | Usuario, rol, banco e institución    |
+| `@Autenticado()` | JWT válido, con o sin asignación   | Solo `usuarioId`, si existe en SIGBA |
+| `@Publico()`     | Nada                               | Ninguno                              |
+
+`@Autenticado()` existe para quien todavía no tiene banco: la persona que
+pregunta a qué bancos tiene acceso o que acepta una invitación. Quien se
+registró en Auth0 sin invitación también pasa, así que estas rutas no leen
+datos de ningún banco. Si el usuario no existe en SIGBA, el contexto llega
+vacío y la ruta decide qué responder; la identidad verificada sigue en
+`request.identidad`.
 
 ## Tiempo de una transacción de tenant
 

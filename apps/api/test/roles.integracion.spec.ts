@@ -10,8 +10,10 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { AsignacionesDeUsuario } from '../src/core/autorizacion/asignaciones-de-usuario.js';
 import {
+  Autenticado,
   CoreModule,
   executeTransactionWithTenant,
+  getTenantContext,
   GUARDS_GLOBALES,
   PrismaService,
   Roles,
@@ -57,6 +59,7 @@ const USUARIOS = {
   adminA: '88888888-0000-4000-8000-000000000005',
   inactivo: '88888888-0000-4000-8000-000000000006',
   institucionY: '88888888-0000-4000-8000-000000000007',
+  sinAsignacion: '88888888-0000-4000-8000-000000000008',
 } as const;
 
 const sub = (id: string) => `prueba|${id}`;
@@ -127,6 +130,12 @@ class PruebaController {
       app,
       (tx) => tx.$queryRaw<{ nombre: string }[]>`SELECT nombre FROM plataforma.bodega`,
     );
+  }
+
+  @Autenticado()
+  @Get('sesion')
+  sesion() {
+    return getTenantContext();
   }
 
   @Roles('institucion')
@@ -509,6 +518,37 @@ describe.skipIf(!URL_ADMIN)('Roles por banco contra PostgreSQL (SBA-18)', () => 
         .post('/prueba/precios/aprobar')
         .set({ ...como(USUARIOS.operario, bancoA), ...previo })
         .expect(403);
+    });
+
+    it('@Autenticado() sin token responde 401', async () => {
+      await request(nest.getHttpServer()).get('/prueba/sesion').expect(401);
+    });
+
+    it('@Autenticado() deja entrar a un usuario sin asignaciones y fija solo su id', async () => {
+      const respuesta = await request(nest.getHttpServer())
+        .get('/prueba/sesion')
+        .set(como(USUARIOS.sinAsignacion, bancoA))
+        .expect(200);
+
+      expect(respuesta.body).toEqual({ usuarioId: USUARIOS.sinAsignacion });
+    });
+
+    it('@Autenticado() no fija banco aunque el usuario tenga rol en el pedido', async () => {
+      const respuesta = await request(nest.getHttpServer())
+        .get('/prueba/sesion')
+        .set(como(USUARIOS.adminA, bancoA))
+        .expect(200);
+
+      expect(respuesta.body).toEqual({ usuarioId: USUARIOS.adminA });
+    });
+
+    it('@Autenticado() deja entrar a quien aún no existe en SIGBA, sin usuario', async () => {
+      const respuesta = await request(nest.getHttpServer())
+        .get('/prueba/sesion')
+        .set({ authorization: `Bearer ${token('prueba|recien-registrado')}` })
+        .expect(200);
+
+      expect(respuesta.body).toEqual({});
     });
 
     it('super_admin entra pero no ve filas de ningún banco', async () => {

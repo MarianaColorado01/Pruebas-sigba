@@ -11,7 +11,8 @@ import { ROLES_PERMITIDOS } from './roles.guard.js';
  *   @Roles('admin_banco', 'coordinacion')
  *   @Post(':id/aprobar')
  *
- * El guard global de roles exige este metadato, salvo que la ruta sea pública.
+ * El guard global de roles exige este metadato, salvo en rutas con `@Publico()`
+ * o `@Autenticado()`.
  */
 export function Roles(...roles: [Rol, ...Rol[]]) {
   return applyDecorators(

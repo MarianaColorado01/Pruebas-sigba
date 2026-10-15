@@ -1,11 +1,25 @@
 import type { IdentidadDeAutenticacion } from '../../../core/index.js';
 
 /**
- * Puerto por el que se busca un usuario por su identidad de Auth0 (SBA-8).
- * El adaptador de Prisma vive en `repositories/`: `services/` no importa el
- * SDK (RNF-03).
+ * Una fila de `usuario_rol` con el nombre de su banco. El rol llega como el
+ * código que guarda la base; el servicio descarta los que no son del contrato.
+ */
+export interface FilaDeAsignacion {
+  rol: string;
+  bancoId: string | null;
+  bancoNombre: string | null;
+  institucionId: string | null;
+}
+
+/**
+ * Puerto por el que se busca un usuario por su identidad de Auth0 (SBA-8) y
+ * se leen sus asignaciones (SBA-19). El adaptador de Prisma vive en
+ * `repositories/`: `services/` no importa el SDK (RNF-03).
  */
 export abstract class UsuariosRepositorio {
   /** Id del usuario activo con ese emisor y `sub`, o `undefined`. */
   abstract idPorIdentidad(identidad: IdentidadDeAutenticacion): Promise<string | undefined>;
+
+  /** Asignaciones activas del usuario, solo de bancos activos o sin banco. */
+  abstract asignacionesActivas(usuarioId: string): Promise<FilaDeAsignacion[]>;
 }

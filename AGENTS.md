@@ -102,7 +102,9 @@ te va a dejar.
   (Arquitectura 8.6). El token de Auth0 vive en memoria, nunca en localStorage,
   sessionStorage ni IndexedDB (ADR-06).
 - Todo endpoint exige JWT válido y rol autorizado (RNF-01). Excepción: `modules/health`,
-  la sonda de Fly.io.
+  la sonda de Fly.io. Las rutas con `@Autenticado()` piden JWT válido sin asignación,
+  para quien todavía no tiene banco (`GET /yo/asignaciones`, aceptar una invitación), y
+  no leen datos de ningún banco.
 - Toda escritura de negocio registra actor, banco y fecha en auditoría (RNF-04).
 - `beneficiarios` consume `SalidaRegistrada` y no escribe inventario (ADR-14). Lo que
   calcula es cobertura estimada, nunca entrega individual acreditada.

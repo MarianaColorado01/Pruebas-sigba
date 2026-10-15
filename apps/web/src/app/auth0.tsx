@@ -38,8 +38,8 @@ export function ProviderAuth0({ children }: { children: ReactNode }) {
 }
 
 export function AccesoAuth0({ children }: { children: ReactNode }) {
-  const { error, isAuthenticated, isLoading, loginWithRedirect, logout } = useAuth0();
-  const { requerido, marcarRequerido } = useEstadoReautenticacion();
+  const { error, isAuthenticated, isLoading, loginWithRedirect } = useAuth0();
+  const { requerido } = useEstadoReautenticacion();
 
   if (isLoading)
     return (
@@ -72,17 +72,6 @@ export function AccesoAuth0({ children }: { children: ReactNode }) {
           <Button onClick={() => loginWithRedirect()}>Iniciar sesión</Button>
         </div>
       )}
-      <header className="flex justify-end p-2">
-        <Button
-          variant="outline"
-          onClick={() => {
-            marcarRequerido(false);
-            logout({ logoutParams: { returnTo: window.location.origin } });
-          }}
-        >
-          Cerrar sesión
-        </Button>
-      </header>
       {children}
     </>
   );

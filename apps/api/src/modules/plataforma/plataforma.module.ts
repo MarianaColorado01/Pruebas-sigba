@@ -17,6 +17,7 @@ import { UsuariosService } from './services/usuarios.service.js';
 // Bancos y bodegas (SBA-19)
 import { BancosController } from './controllers/bancos.controller.js';
 import { BodegasController } from './controllers/bodegas.controller.js';
+import { YoController } from './controllers/yo.controller.js';
 import { BancosPrismaRepositorio } from './repositories/bancos.prisma.repositorio.js';
 import { AdministracionDeBancosService } from './services/administracion-de-bancos.service.js';
 import { AdministracionDeBodegasService } from './services/administracion-de-bodegas.service.js';
@@ -39,6 +40,8 @@ import { BancosRepositorio } from './services/banco.js';
     // Bancos y bodegas (SBA-19)
     BancosController,
     BodegasController,
+    // Sesión y asignaciones (SBA-19)
+    YoController,
   ],
   providers: [
     ConsultaDeAuditoriaService,

@@ -3,6 +3,7 @@ import { ROLES, type Rol } from '@sigba/shared-types';
 import {
   RESOLUTOR_DE_IDENTIDAD,
   type ResolutorDeIdentidad,
+  type UsuarioResuelto,
 } from '../auth/resolutor-de-identidad.js';
 import { executeTransactionWithTenant } from '../database/prisma-rls.extension.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -31,6 +32,14 @@ export class AsignacionesDeUsuario {
     private readonly prisma: PrismaService,
     @Inject(RESOLUTOR_DE_IDENTIDAD) private readonly resolutor: ResolutorDeIdentidad,
   ) {}
+
+  /**
+   * El usuario de SIGBA de esa identidad, sin leer sus asignaciones. Lo usan
+   * las rutas con `@Autenticado()`. `undefined` si no existe o está desactivado.
+   */
+  usuarioDe(auth0Sub: string, emisor: string): Promise<UsuarioResuelto | undefined> {
+    return this.resolutor.resolverIdentidad({ auth0Sub, emisor });
+  }
 
   /**
    * Asignaciones activas del usuario identificado por issuer y `sub`, en

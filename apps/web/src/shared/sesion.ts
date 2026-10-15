@@ -8,7 +8,7 @@ import { ErrorDeApi, pedir, pedirConEtag } from './clienteHttp.ts';
  * Con qué rol, banco e institución actúa la persona en esta sesión
  * (Arquitectura 8.2). Vive en memoria, como el token (ADR-06).
  *
- * `null` mientras no hay sesión. La llena el inicio de sesión de SBA-8.
+ * `null` mientras no hay banco elegido. La llena `SesionProvider` (app/).
  */
 export interface AsignacionActiva {
   rol: Rol;

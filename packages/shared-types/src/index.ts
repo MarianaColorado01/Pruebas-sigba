@@ -47,6 +47,18 @@ export const CABECERAS = {
   institucion: 'x-institucion-id',
 } as const;
 
+/**
+ * Una asignación activa de la persona en un banco activo, como la devuelve
+ * `GET /api/v1/yo/asignaciones`. La PWA la usa para elegir con qué banco
+ * trabajar. `super_admin` va sin banco.
+ */
+export interface AsignacionDeUsuario {
+  rol: Rol;
+  bancoId: string | null;
+  bancoNombre: string | null;
+  institucionId: string | null;
+}
+
 export const CLAVES_PARAMETRO = [
   'aporte_solidario_pct',
   'semaforo_rojo_dias',
