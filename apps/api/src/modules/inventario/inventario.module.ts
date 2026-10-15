@@ -4,12 +4,14 @@ import { BajasYAjustesController } from './controllers/bajas-y-ajustes.controlle
 import { PreciosController } from './controllers/precios.controller.js';
 import { RecepcionesController } from './controllers/recepciones.controller.js';
 import { ReferenciasController } from './controllers/referencias.controller.js';
+import { StockController } from './controllers/stock.controller.js';
 import { BajasYAjustesPrismaRepositorio } from './repositories/bajas-y-ajustes.prisma.repositorio.js';
 import { CategoriasPrismaRepositorio } from './repositories/categorias.prisma.repositorio.js';
 import { DonantesPrismaRepositorio } from './repositories/donantes.prisma.repositorio.js';
 import { PreciosPrismaRepositorio } from './repositories/precios.prisma.repositorio.js';
 import { RecepcionesPrismaRepositorio } from './repositories/recepciones.prisma.repositorio.js';
 import { ReferenciasPrismaRepositorio } from './repositories/referencias.prisma.repositorio.js';
+import { StockPrismaRepositorio } from './repositories/stock.prisma.repositorio.js';
 import { BajasYAjustesRepositorio } from './services/baja-y-ajuste.js';
 import { BajasYAjustesService } from './services/bajas-y-ajustes.service.js';
 import { CategoriasRepositorio } from './services/categoria.js';
@@ -22,6 +24,8 @@ import { RecepcionesRepositorio } from './services/recepcion.js';
 import { RecepcionesService } from './services/recepciones.service.js';
 import { ReferenciasRepositorio } from './services/referencia.js';
 import { ReferenciasService } from './services/referencias.service.js';
+import { StockRepositorio } from './services/stock.js';
+import { StockService } from './services/stock.service.js';
 
 /**
  * Inventario · Equipo 2
@@ -37,6 +41,7 @@ import { ReferenciasService } from './services/referencias.service.js';
     PreciosController,
     RecepcionesController,
     ReferenciasController,
+    StockController,
   ],
   providers: [
     DonantesService,
@@ -51,6 +56,8 @@ import { ReferenciasService } from './services/referencias.service.js';
     { provide: BajasYAjustesRepositorio, useClass: BajasYAjustesPrismaRepositorio },
     PreciosService,
     { provide: PreciosRepositorio, useClass: PreciosPrismaRepositorio },
+    StockService,
+    { provide: StockRepositorio, useClass: StockPrismaRepositorio },
   ],
   exports: [ReferenciasService],
 })

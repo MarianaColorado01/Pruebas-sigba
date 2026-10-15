@@ -43,6 +43,10 @@ export function Inicio() {
       >
         Buscar en el catálogo
       </Link>
+
+      <Link to="/stock" className={buttonVariants({ variant: 'outline', className: 'self-start' })}>
+        Consultar stock
+      </Link>
     </main>
   );
 }

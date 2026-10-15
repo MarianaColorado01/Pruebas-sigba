@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router';
 import { CatalogoPage } from '../features/inventario/CatalogoPage.tsx';
+import { StockPage } from '../features/inventario/StockPage.tsx';
 import { Inicio } from './Inicio.tsx';
 
 /**
@@ -14,5 +15,9 @@ export const enrutador = createBrowserRouter([
   {
     path: '/catalogo',
     element: <CatalogoPage />,
+  },
+  {
+    path: '/stock',
+    element: <StockPage />,
   },
 ]);
