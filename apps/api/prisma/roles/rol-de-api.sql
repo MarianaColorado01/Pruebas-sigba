@@ -83,6 +83,9 @@ GRANT SELECT ON core.auditoria TO sigba_app;
 -- El SELECT deja que las pruebas de aislamiento demuestren la política como sigba_app.
 GRANT SELECT ON core.comando_procesado TO sigba_app;
 
+-- core: outbox se escribe por su función con banco del contexto de transacción.
+GRANT SELECT ON core.outbox TO sigba_app;
+
 -- inventario
 GRANT SELECT, INSERT, UPDATE ON inventario.categoria TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON inventario.producto TO sigba_app;
@@ -106,5 +109,8 @@ GRANT EXECUTE ON FUNCTION core.registrar_auditoria(text, text, text, text, jsonb
 
 -- Idempotencia de comandos (SBA-69).
 GRANT EXECUTE ON FUNCTION core.reclamar_comando(uuid, smallint, text, text, uuid) TO sigba_app;
+
+-- Outbox transaccional (SBA-30).
+GRANT EXECUTE ON FUNCTION core.emitir_evento(text, smallint, jsonb) TO sigba_app;
 
 COMMIT;

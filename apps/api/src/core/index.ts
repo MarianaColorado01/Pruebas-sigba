@@ -24,3 +24,4 @@ export {
   type ComandoAReclamar,
   type ResultadoDeComando,
 } from './idempotencia/idempotencia.service.js';
+export { OutboxService, type EventoDeDominio } from './outbox/outbox.service.js';

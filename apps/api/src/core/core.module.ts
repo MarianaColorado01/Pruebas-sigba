@@ -18,6 +18,7 @@ import { TOKEN_VERIFIER } from './auth/token-verifier.js';
 import { AuditService } from './auditoria/audit.service.js';
 import { PrismaService } from './database/prisma.service.js';
 import { IdempotenciaService } from './idempotencia/idempotencia.service.js';
+import { OutboxService } from './outbox/outbox.service.js';
 
 @Global()
 @Module({
@@ -25,11 +26,12 @@ import { IdempotenciaService } from './idempotencia/idempotencia.service.js';
     PrismaService,
     AuditService,
     IdempotenciaService,
+    OutboxService,
     {
       provide: TOKEN_VERIFIER,
       useFactory: () => new Auth0TokenVerifier(cargarConfiguracionAuth0()),
     },
   ],
-  exports: [PrismaService, AuditService, IdempotenciaService, TOKEN_VERIFIER],
+  exports: [PrismaService, AuditService, IdempotenciaService, OutboxService, TOKEN_VERIFIER],
 })
 export class CoreModule {}

@@ -1,0 +1,396 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sigba.invalid/eventos/contratos.v1.json",
+  "$defs": {
+    "Uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "Cantidad": { "type": "number", "exclusiveMinimum": 0 },
+    "RecepcionConfirmada_v1": {
+      "title": "RecepcionConfirmada v1",
+      "type": "object",
+      "properties": {
+        "tipo": { "const": "RecepcionConfirmada" },
+        "version": { "const": 1 },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "recepcionId": { "$ref": "#/$defs/Uuid" },
+            "bodegaId": { "$ref": "#/$defs/Uuid" },
+            "donanteId": { "$ref": "#/$defs/Uuid" },
+            "origen": { "enum": ["propia", "ABACO", "plataforma"] },
+            "detalles": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "referenciaId": { "$ref": "#/$defs/Uuid" },
+                  "loteId": { "$ref": "#/$defs/Uuid" },
+                  "cantidad": { "$ref": "#/$defs/Cantidad" }
+                },
+                "required": ["referenciaId", "loteId", "cantidad"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["recepcionId", "bodegaId", "donanteId", "origen", "detalles"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["tipo", "version", "payload"],
+      "additionalProperties": false,
+      "examples": [
+        {
+          "tipo": "RecepcionConfirmada",
+          "version": 1,
+          "payload": {
+            "recepcionId": "00000000-0000-4000-8000-000000000001",
+            "bodegaId": "00000000-0000-4000-8000-000000000002",
+            "donanteId": "00000000-0000-4000-8000-000000000003",
+            "origen": "propia",
+            "detalles": [
+              {
+                "referenciaId": "00000000-0000-4000-8000-000000000004",
+                "loteId": "00000000-0000-4000-8000-000000000005",
+                "cantidad": 12
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "SalidaRegistrada_v1": {
+      "title": "SalidaRegistrada v1",
+      "type": "object",
+      "properties": {
+        "tipo": { "const": "SalidaRegistrada" },
+        "version": { "const": 1 },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "salidaId": { "$ref": "#/$defs/Uuid" },
+            "institucionId": { "$ref": "#/$defs/Uuid" },
+            "bodegaId": { "$ref": "#/$defs/Uuid" },
+            "despachadorTipo": { "enum": ["funcionario", "voluntario"] },
+            "detalles": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "referenciaId": { "$ref": "#/$defs/Uuid" },
+                  "loteId": { "$ref": "#/$defs/Uuid" },
+                  "cantidad": { "$ref": "#/$defs/Cantidad" }
+                },
+                "required": ["referenciaId", "loteId", "cantidad"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["salidaId", "institucionId", "bodegaId", "despachadorTipo", "detalles"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["tipo", "version", "payload"],
+      "additionalProperties": false,
+      "examples": [
+        {
+          "tipo": "SalidaRegistrada",
+          "version": 1,
+          "payload": {
+            "salidaId": "00000000-0000-4000-8000-000000000006",
+            "institucionId": "00000000-0000-4000-8000-000000000007",
+            "bodegaId": "00000000-0000-4000-8000-000000000002",
+            "despachadorTipo": "funcionario",
+            "detalles": [
+              {
+                "referenciaId": "00000000-0000-4000-8000-000000000004",
+                "loteId": "00000000-0000-4000-8000-000000000005",
+                "cantidad": 2
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "LoteProximoAVencer_v1": {
+      "title": "LoteProximoAVencer v1",
+      "type": "object",
+      "properties": {
+        "tipo": { "const": "LoteProximoAVencer" },
+        "version": { "const": 1 },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "loteId": { "$ref": "#/$defs/Uuid" },
+            "bodegaId": { "$ref": "#/$defs/Uuid" },
+            "referenciaId": { "$ref": "#/$defs/Uuid" },
+            "fechaVencimiento": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+            "diasRestantes": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["loteId", "bodegaId", "referenciaId", "fechaVencimiento", "diasRestantes"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["tipo", "version", "payload"],
+      "additionalProperties": false,
+      "examples": [
+        {
+          "tipo": "LoteProximoAVencer",
+          "version": 1,
+          "payload": {
+            "loteId": "00000000-0000-4000-8000-000000000005",
+            "bodegaId": "00000000-0000-4000-8000-000000000002",
+            "referenciaId": "00000000-0000-4000-8000-000000000004",
+            "fechaVencimiento": "2026-10-20",
+            "diasRestantes": 8
+          }
+        }
+      ]
+    },
+    "PrecioActualizado_v1": {
+      "title": "PrecioActualizado v1",
+      "type": "object",
+      "properties": {
+        "tipo": { "const": "PrecioActualizado" },
+        "version": { "const": 1 },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "precioId": { "$ref": "#/$defs/Uuid" },
+            "referenciaId": { "$ref": "#/$defs/Uuid" },
+            "valor": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]{1,2})?$" },
+            "moneda": { "const": "COP" },
+            "vigenteDesde": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+            }
+          },
+          "required": ["precioId", "referenciaId", "valor", "moneda", "vigenteDesde"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["tipo", "version", "payload"],
+      "additionalProperties": false,
+      "examples": [
+        {
+          "tipo": "PrecioActualizado",
+          "version": 1,
+          "payload": {
+            "precioId": "00000000-0000-4000-8000-000000000008",
+            "referenciaId": "00000000-0000-4000-8000-000000000004",
+            "valor": "2500.00",
+            "moneda": "COP",
+            "vigenteDesde": "2026-10-12T12:00:00Z"
+          }
+        }
+      ]
+    },
+    "TrasladoConfirmado_v1": {
+      "title": "TrasladoConfirmado v1",
+      "type": "object",
+      "properties": {
+        "tipo": { "const": "TrasladoConfirmado" },
+        "version": { "const": 1 },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "trasladoId": { "$ref": "#/$defs/Uuid" },
+            "bodegaOrigenId": { "$ref": "#/$defs/Uuid" },
+            "bodegaDestinoId": { "$ref": "#/$defs/Uuid" },
+            "detalles": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "referenciaId": { "$ref": "#/$defs/Uuid" },
+                  "loteOrigenId": { "$ref": "#/$defs/Uuid" },
+                  "loteDestinoId": { "$ref": "#/$defs/Uuid" },
+                  "cantidadEnviada": { "$ref": "#/$defs/Cantidad" },
+                  "cantidadRecibida": { "$ref": "#/$defs/Cantidad" }
+                },
+                "required": [
+                  "referenciaId",
+                  "loteOrigenId",
+                  "loteDestinoId",
+                  "cantidadEnviada",
+                  "cantidadRecibida"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["trasladoId", "bodegaOrigenId", "bodegaDestinoId", "detalles"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["tipo", "version", "payload"],
+      "additionalProperties": false,
+      "examples": [
+        {
+          "tipo": "TrasladoConfirmado",
+          "version": 1,
+          "payload": {
+            "trasladoId": "00000000-0000-4000-8000-000000000009",
+            "bodegaOrigenId": "00000000-0000-4000-8000-000000000002",
+            "bodegaDestinoId": "00000000-0000-4000-8000-000000000010",
+            "detalles": [
+              {
+                "referenciaId": "00000000-0000-4000-8000-000000000004",
+                "loteOrigenId": "00000000-0000-4000-8000-000000000005",
+                "loteDestinoId": "00000000-0000-4000-8000-000000000011",
+                "cantidadEnviada": 10,
+                "cantidadRecibida": 9
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "MembresiaActivada_v1": {
+      "title": "MembresiaActivada v1",
+      "type": "object",
+      "properties": {
+        "tipo": { "const": "MembresiaActivada" },
+        "version": { "const": 1 },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "membresiaId": { "$ref": "#/$defs/Uuid" },
+            "beneficiarioId": { "$ref": "#/$defs/Uuid" },
+            "institucionId": { "$ref": "#/$defs/Uuid" }
+          },
+          "required": ["membresiaId", "beneficiarioId", "institucionId"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["tipo", "version", "payload"],
+      "additionalProperties": false,
+      "examples": [
+        {
+          "tipo": "MembresiaActivada",
+          "version": 1,
+          "payload": {
+            "membresiaId": "00000000-0000-4000-8000-000000000012",
+            "beneficiarioId": "00000000-0000-4000-8000-000000000013",
+            "institucionId": "00000000-0000-4000-8000-000000000007"
+          }
+        }
+      ]
+    },
+    "MembresiaCerrada_v1": {
+      "title": "MembresiaCerrada v1",
+      "type": "object",
+      "properties": {
+        "tipo": { "const": "MembresiaCerrada" },
+        "version": { "const": 1 },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "membresiaId": { "$ref": "#/$defs/Uuid" },
+            "beneficiarioId": { "$ref": "#/$defs/Uuid" },
+            "institucionId": { "$ref": "#/$defs/Uuid" }
+          },
+          "required": ["membresiaId", "beneficiarioId", "institucionId"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["tipo", "version", "payload"],
+      "additionalProperties": false,
+      "examples": [
+        {
+          "tipo": "MembresiaCerrada",
+          "version": 1,
+          "payload": {
+            "membresiaId": "00000000-0000-4000-8000-000000000012",
+            "beneficiarioId": "00000000-0000-4000-8000-000000000013",
+            "institucionId": "00000000-0000-4000-8000-000000000007"
+          }
+        }
+      ]
+    },
+    "AlertaDuplicidadAbierta_v1": {
+      "title": "AlertaDuplicidadAbierta v1",
+      "type": "object",
+      "properties": {
+        "tipo": { "const": "AlertaDuplicidadAbierta" },
+        "version": { "const": 1 },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "alertaId": { "$ref": "#/$defs/Uuid" },
+            "beneficiarioId": { "$ref": "#/$defs/Uuid" },
+            "institucionSolicitanteId": { "$ref": "#/$defs/Uuid" }
+          },
+          "required": ["alertaId", "beneficiarioId", "institucionSolicitanteId"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["tipo", "version", "payload"],
+      "additionalProperties": false,
+      "examples": [
+        {
+          "tipo": "AlertaDuplicidadAbierta",
+          "version": 1,
+          "payload": {
+            "alertaId": "00000000-0000-4000-8000-000000000014",
+            "beneficiarioId": "00000000-0000-4000-8000-000000000013",
+            "institucionSolicitanteId": "00000000-0000-4000-8000-000000000007"
+          }
+        }
+      ]
+    },
+    "AlertaDuplicidadResuelta_v1": {
+      "title": "AlertaDuplicidadResuelta v1",
+      "type": "object",
+      "properties": {
+        "tipo": { "const": "AlertaDuplicidadResuelta" },
+        "version": { "const": 1 },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "alertaId": { "$ref": "#/$defs/Uuid" },
+            "estado": { "enum": ["resuelta", "descartada"] },
+            "resolucion": { "enum": ["mantener", "trasladar", null] }
+          },
+          "required": ["alertaId", "estado", "resolucion"],
+          "allOf": [
+            {
+              "if": {
+                "properties": { "estado": { "const": "descartada" } },
+                "required": ["estado"]
+              },
+              "then": { "properties": { "resolucion": { "type": "null" } } }
+            },
+            {
+              "if": {
+                "properties": { "estado": { "const": "resuelta" } },
+                "required": ["estado"]
+              },
+              "then": {
+                "properties": { "resolucion": { "enum": ["mantener", "trasladar"] } }
+              }
+            }
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["tipo", "version", "payload"],
+      "additionalProperties": false,
+      "examples": [
+        {
+          "tipo": "AlertaDuplicidadResuelta",
+          "version": 1,
+          "payload": {
+            "alertaId": "00000000-0000-4000-8000-000000000014",
+            "estado": "descartada",
+            "resolucion": null
+          }
+        }
+      ]
+    }
+  }
+}

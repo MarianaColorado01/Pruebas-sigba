@@ -42,6 +42,7 @@
     "@types/node": "catalog:",
     "@types/supertest": "^7.0.0",
     "@vitest/coverage-v8": "catalog:",
+    "ajv": "catalog:",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "globals": "catalog:",

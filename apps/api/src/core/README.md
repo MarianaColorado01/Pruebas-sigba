@@ -16,7 +16,9 @@ importa un módulo. El lint lo comprueba y falla si se invierte (ADR-01).
 - `AuditService` y auditoría base: SBA-21.
 - `IdempotenciaService` y `core.comando_procesado`: SBA-69. Ver
   [docs/arquitectura/idempotencia-de-comandos.md](../../../../docs/arquitectura/idempotencia-de-comandos.md).
-- `EventPublisher` y outbox transaccional: SBA-30.
+- `OutboxService.emitir()` escribe eventos dentro de la transacción del caso de uso: SBA-30.
+  Los contratos permanecen en borrador hasta la aprobación de arquitectura y de los equipos
+  consumidores.
 - Puertos de almacenamiento, correo, visión y precios: SBA-13 y SBA-54.
 
 `core/` es ruta con CODEOWNER: todo cambio pasa por revisión de arquitectura
