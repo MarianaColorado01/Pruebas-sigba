@@ -72,7 +72,8 @@ GRANT SELECT ON plataforma.banco TO sigba_app;
 GRANT SELECT ON plataforma.usuario TO sigba_app;
 GRANT SELECT ON plataforma.rol TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON plataforma.bodega TO sigba_app;
-GRANT SELECT, INSERT, UPDATE ON plataforma.parametro_banco TO sigba_app;
+GRANT SELECT, INSERT ON plataforma.parametro_banco TO sigba_app;
+GRANT UPDATE (fecha_fin, valor) ON plataforma.parametro_banco TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON plataforma.usuario_rol TO sigba_app;
 
 -- core: auditoría append-only. Se lee por RLS y se escribe solo con

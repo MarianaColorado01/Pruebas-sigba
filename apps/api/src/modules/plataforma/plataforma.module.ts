@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
 import { RESOLUTOR_DE_IDENTIDAD } from '../../core/index.js';
+import { ParametrosLectura, ParametrosService } from './services/parametros.service.js';
 import { AuditoriaController } from './controllers/auditoria.controller.js';
 import { AuditoriaPrismaRepositorio } from './repositories/auditoria.prisma.repositorio.js';
 import { BodegasPrismaRepositorio } from './repositories/bodegas.prisma.repositorio.js';
+import { ParametrosPrismaRepositorio } from './repositories/parametros.prisma.repositorio.js';
+import { ParametrosRepositorio } from './services/parametros.repositorio.js';
+import { ParametrosController } from './controllers/parametros.controller.js';
 import { UsuariosPrismaRepositorio } from './repositories/usuarios.prisma.repositorio.js';
 import { AuditoriaRepositorio } from './services/auditoria.js';
 import { BodegasRepositorio } from './services/bodega.js';
@@ -22,7 +26,7 @@ import { UsuariosService } from './services/usuarios.service.js';
  */
 @Module({
   imports: [],
-  controllers: [AuditoriaController],
+  controllers: [ParametrosController, AuditoriaController],
   providers: [
     ConsultaDeAuditoriaService,
     { provide: AuditoriaRepositorio, useClass: AuditoriaPrismaRepositorio },
@@ -30,8 +34,11 @@ import { UsuariosService } from './services/usuarios.service.js';
     { provide: BodegasRepositorio, useClass: BodegasPrismaRepositorio },
     UsuariosService,
     { provide: UsuariosRepositorio, useClass: UsuariosPrismaRepositorio },
+    ParametrosService,
+    { provide: ParametrosRepositorio, useClass: ParametrosPrismaRepositorio },
+    { provide: ParametrosLectura, useExisting: ParametrosService },
     { provide: RESOLUTOR_DE_IDENTIDAD, useExisting: UsuariosService },
   ],
-  exports: [BodegasService, RESOLUTOR_DE_IDENTIDAD],
+  exports: [BodegasService, RESOLUTOR_DE_IDENTIDAD, ParametrosLectura],
 })
 export class PlataformaModule {}

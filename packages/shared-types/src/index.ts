@@ -47,6 +47,46 @@ export const CABECERAS = {
   institucion: 'x-institucion-id',
 } as const;
 
+export const CLAVES_PARAMETRO = [
+  'aporte_solidario_pct',
+  'semaforo_rojo_dias',
+  'semaforo_amarillo_dias',
+  'rangos_etarios',
+  'factor_minorista',
+  'recordatorio_borrador_horas',
+  'retencion_dias',
+] as const;
+
+export type ClaveParametro = (typeof CLAVES_PARAMETRO)[number];
+
+export interface RangoEtario {
+  desde: number;
+  hasta: number | null;
+}
+
+export interface ValorParametro {
+  aporte_solidario_pct: number;
+  semaforo_rojo_dias: number;
+  semaforo_amarillo_dias: number;
+  rangos_etarios: RangoEtario[];
+  factor_minorista: number;
+  recordatorio_borrador_horas: number;
+  retencion_dias: number;
+}
+
+export interface ParametroVigente<K extends ClaveParametro> {
+  valor: ValorParametro[K];
+  version: number;
+  fecha_inicio: string;
+  fecha_fin: string | null;
+}
+
+export type ParametroListado = {
+  [K in ClaveParametro]: { clave: K } & ParametroVigente<K>;
+}[ClaveParametro];
+
+export type ParametroHistorial = ParametroListado;
+
 /**
  * Acciones que registra `core.auditoria` (RNF-04). `leer` es una consulta de
  * datos personales: guarda qué conjunto y cuántas filas, nunca su contenido
