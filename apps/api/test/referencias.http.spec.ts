@@ -55,6 +55,15 @@ describe('HTTP del catálogo (SBA-22)', () => {
     buscar: vi.fn(),
     catalogo: vi.fn(),
     crearCategoria: vi.fn(),
+    crearDesdeCelular: vi.fn(),
+    presentacionesSimilares: vi.fn(),
+  };
+
+  const COMANDO = {
+    comandoId: '01920000-0000-7000-8000-000000000001',
+    productoId: '66666666-6666-4666-8666-666666666666',
+    presentacion: '480 g',
+    equivalenciaKg: 0.48,
   };
 
   function como(sub: string, metodo: 'get' | 'post', ruta: string) {
@@ -87,6 +96,8 @@ describe('HTTP del catálogo (SBA-22)', () => {
     referencias.buscar.mockReset().mockResolvedValue([]);
     referencias.catalogo.mockReset().mockResolvedValue({ version: VERSION, categorias: [] });
     referencias.crearCategoria.mockReset().mockResolvedValue({ id: 'categoria-1' });
+    referencias.crearDesdeCelular.mockReset();
+    referencias.presentacionesSimilares.mockReset().mockResolvedValue([]);
   });
 
   afterAll(async () => {
@@ -153,5 +164,48 @@ describe('HTTP del catálogo (SBA-22)', () => {
     await como('coordinacion', 'post', 'categorias').send({ nombre: 'Cereales' }).expect(201);
 
     expect(referencias.crearCategoria).toHaveBeenCalledWith({ nombre: 'Cereales' });
+  });
+
+  describe('alta desde el celular (SBA-23)', () => {
+    it('responde 201 la primera vez y 200 con lo mismo si el celular reenvía', async () => {
+      const referencia = { id: 'referencia-1', presentacion: '480 g' };
+      referencias.crearDesdeCelular
+        .mockResolvedValueOnce({ referencia, repetida: false })
+        .mockResolvedValueOnce({ referencia, repetida: true });
+
+      const primera = await como('operario', 'post', 'referencias/desde-celular')
+        .send(COMANDO)
+        .expect(201);
+      const segunda = await como('operario', 'post', 'referencias/desde-celular')
+        .send(COMANDO)
+        .expect(200);
+
+      expect(primera.body).toEqual(referencia);
+      expect(segunda.body).toEqual(referencia);
+      expect(referencias.crearDesdeCelular).toHaveBeenCalledWith({
+        ...COMANDO,
+        equivalenciaKg: '0.48',
+      });
+    });
+
+    it('responde 400 sin un comandoId UUID', async () => {
+      await como('operario', 'post', 'referencias/desde-celular')
+        .send({ ...COMANDO, comandoId: 'provisional' })
+        .expect(400);
+      expect(referencias.crearDesdeCelular).not.toHaveBeenCalled();
+    });
+
+    it('sugiere similares al operario por producto, presentación y kilos', async () => {
+      await como(
+        'operario',
+        'get',
+        `productos/${COMANDO.productoId}/presentaciones-similares?presentacion=1000%20g&equivalenciaKg=1`,
+      ).expect(200);
+
+      expect(referencias.presentacionesSimilares).toHaveBeenCalledWith(COMANDO.productoId, {
+        presentacion: '1000 g',
+        equivalenciaKg: '1',
+      });
+    });
   });
 });

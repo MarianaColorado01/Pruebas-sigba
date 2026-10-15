@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { AuditService } from '../src/core/index.js';
+import { AuditService, IdempotenciaService } from '../src/core/index.js';
 import { type PrismaService, runWithTenantContext } from '../src/core/database/index.js';
 import { ReferenciasPrismaRepositorio } from '../src/modules/inventario/repositories/referencias.prisma.repositorio.js';
 import { ReferenciasService } from '../src/modules/inventario/services/referencias.service.js';
@@ -159,7 +159,11 @@ describe.skipIf(!URL_ADMIN)('Catálogo contra PostgreSQL (SBA-22)', () => {
     admin = new PrismaClient({ datasourceUrl: URL_ADMIN });
     app = new PrismaClient({ datasourceUrl: urlComoRolApp(URL_ADMIN as string) });
     // PrismaService es un PrismaClient; aquí va uno conectado con el rol de la app.
-    repositorio = new ReferenciasPrismaRepositorio(app as PrismaService, new AuditService());
+    repositorio = new ReferenciasPrismaRepositorio(
+      app as PrismaService,
+      new AuditService(),
+      new IdempotenciaService(),
+    );
     servicio = new ReferenciasService(repositorio);
   });
 
@@ -513,6 +517,98 @@ describe.skipIf(!URL_ADMIN)('Catálogo contra PostgreSQL (SBA-22)', () => {
       banco_id: bancoA,
       creado_por: 'coordinacion-prueba',
       actualizado_por: 'coordinacion-prueba',
+    });
+  });
+
+  describe('alta desde el celular (SBA-23)', () => {
+    // core.comando_procesado es append-only: cada prueba usa comandos nuevos.
+    function alta(productoId: string, cambios: Record<string, string> = {}) {
+      return {
+        comandoId: randomUUID(),
+        productoId,
+        presentacion: '480 g promocional',
+        equivalenciaKg: '0.48',
+        ...cambios,
+      };
+    }
+
+    it('queda disponible de inmediato en la búsqueda, marcada y auditada', async () => {
+      const { arroz } = await catalogoDePrueba();
+
+      const { referencia, repetida } = await enBanco(bancoA, () =>
+        servicio.crearDesdeCelular(alta(arroz.id)),
+      );
+      const encontradas = await enBanco(bancoA, () => servicio.buscar({ texto: 'arroz 480' }));
+
+      expect(repetida).toBe(false);
+      expect(encontradas.map((r) => r.id)).toEqual([referencia.id]);
+      expect(encontradas[0]?.creadaDesdeCelular).toBe(true);
+      expect((await auditoriaDe(referencia.id)).map((a) => a.accion)).toEqual(['crear']);
+    });
+
+    it('el reenvío devuelve la misma referencia, no crea otra y no audita dos veces', async () => {
+      const { arroz } = await catalogoDePrueba();
+      const comando = alta(arroz.id);
+
+      const primera = await enBanco(bancoA, () => servicio.crearDesdeCelular(comando));
+      const segunda = await enBanco(bancoA, () => servicio.crearDesdeCelular(comando));
+
+      expect(segunda).toEqual({ referencia: primera.referencia, repetida: true });
+      expect(await auditoriaDe(primera.referencia.id)).toHaveLength(1);
+    });
+
+    it('el mismo comando con otra carga responde 409 y no escribe', async () => {
+      const { arroz } = await catalogoDePrueba();
+      const comando = alta(arroz.id);
+      await enBanco(bancoA, () => servicio.crearDesdeCelular(comando));
+
+      await expect(
+        enBanco(bancoA, () => servicio.crearDesdeCelular({ ...comando, presentacion: '490 g' })),
+      ).rejects.toThrow(ConflictException);
+      expect(await enBanco(bancoA, () => servicio.buscar({ texto: '490' }))).toEqual([]);
+    });
+
+    it('una presentación que ya existe responde 409 y no deja reservado el comando', async () => {
+      const { arroz } = await catalogoDePrueba();
+      const comando = alta(arroz.id, { presentacion: '1 KG', equivalenciaKg: '1' });
+
+      await expect(enBanco(bancoA, () => servicio.crearDesdeCelular(comando))).rejects.toThrow(
+        'Ese producto ya tiene esa presentación.',
+      );
+      const [reserva] = await admin.$queryRaw<{ n: bigint }[]>`
+        SELECT count(*) AS n FROM core.comando_procesado
+        WHERE comando_id = ${comando.comandoId}::uuid`;
+      expect(Number(reserva?.n)).toBe(0);
+    });
+
+    it('sugiere las presentaciones del producto con los mismos kilos o un nombre parecido', async () => {
+      const { arroz, frijolMedio } = await catalogoDePrueba();
+
+      const porKilos = await enBanco(bancoA, () =>
+        servicio.presentacionesSimilares(arroz.id, { presentacion: '1000 g', equivalenciaKg: '1' }),
+      );
+      const porNombre = await enBanco(bancoA, () =>
+        servicio.presentacionesSimilares(arroz.id, { presentacion: 'ARROBA de 12,5' }),
+      );
+
+      expect(porKilos.map((r) => r.presentacion)).toEqual(['1 kg']);
+      expect(porNombre.map((r) => r.presentacion)).toEqual(['arroba']);
+      expect(porKilos.some((r) => r.id === frijolMedio.id)).toBe(false);
+    });
+
+    it('cada banco tiene sus comandos, y el banco B no crea bajo un producto del banco A', async () => {
+      const { arroz } = await catalogoDePrueba();
+      const comando = alta(arroz.id);
+      await enBanco(bancoA, () => servicio.crearDesdeCelular(comando));
+
+      await expect(enBanco(bancoB, () => servicio.crearDesdeCelular(comando))).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(
+        await enBanco(bancoB, () =>
+          servicio.presentacionesSimilares(arroz.id, { equivalenciaKg: '1' }),
+        ),
+      ).toEqual([]);
     });
   });
 

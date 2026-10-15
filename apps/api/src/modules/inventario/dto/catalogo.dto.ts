@@ -114,3 +114,29 @@ export class EditarReferenciaDto {
   @IsString()
   equivalenciaKg?: string;
 }
+
+/** El comando del celular: `comandoId` es su UUIDv7 y la clave de idempotencia. */
+export class CrearDesdeCelularDto {
+  @IsUUID()
+  comandoId!: string;
+
+  @IsUUID()
+  productoId!: string;
+
+  @IsString()
+  presentacion!: string;
+
+  @comoTexto
+  @IsString()
+  equivalenciaKg!: string;
+}
+
+export class PresentacionesSimilaresDto {
+  @IsOptional()
+  @IsString()
+  presentacion?: string;
+
+  @IsOptional()
+  @IsString()
+  equivalenciaKg?: string;
+}

@@ -3,12 +3,15 @@ import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import type { ReferenciaDelCatalogo } from '@/shared/catalogo.ts';
 import { useAsignacion } from '@/shared/sesion.ts';
+import { SoloPara } from '@/shared/SoloPara.tsx';
+import { CrearPresentacion } from './CrearPresentacion.tsx';
 import { useBuscarReferencias } from './useBuscarReferencias.ts';
 import { useCatalogo } from './useCatalogo.ts';
 
 export function CatalogoPage() {
   const [texto, setTexto] = useState('');
   const [seleccionada, setSeleccionada] = useState<string>();
+  const [creando, setCreando] = useState(false);
   const asignacion = useAsignacion();
   const catalogo = useCatalogo();
   const busqueda = useBuscarReferencias(texto, asignacion?.bancoId ?? null, catalogo.data);
@@ -77,6 +80,31 @@ export function CatalogoPage() {
       )}
 
       {grupos.length === 0 && !cargando && <p>No hay referencias que coincidan con la búsqueda.</p>}
+
+      {/* Los mismos roles que la ruta de la API (SBA-23). */}
+      <SoloPara roles={['operario_bodega', 'coordinacion', 'admin_banco']}>
+        {creando ? (
+          <CrearPresentacion
+            productos={
+              catalogo.data?.catalogo.categorias.flatMap((categoria) => categoria.productos) ?? []
+            }
+            onLista={(referencia) => {
+              setTexto(`${referencia.producto.nombre} ${referencia.presentacion}`);
+              setSeleccionada(referencia.id);
+              setCreando(false);
+            }}
+          />
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-12 self-start"
+            onClick={() => setCreando(true)}
+          >
+            ¿No está? Crear presentación
+          </Button>
+        )}
+      </SoloPara>
 
       <div className="flex flex-col gap-5">
         {grupos.map(({ categoria, referencias: delGrupo }) => (

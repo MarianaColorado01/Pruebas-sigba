@@ -7,6 +7,7 @@ import {
   normalizarCodigo,
 } from './categoria.js';
 import {
+  type AltaDesdeCelular,
   type CambiosEnCategoria,
   type CambiosEnProducto,
   type CambiosEnReferencia,
@@ -23,6 +24,8 @@ const LIMITE_DE_BUSQUEDA = 30;
 /** Los largos de las columnas de producto y referencia; los de categoría están en categoria.ts. */
 const LARGO_DE_PRODUCTO = 200;
 const LARGO_DE_PRESENTACION = 100;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Decimal(10,3): hasta siete enteros y tres decimales. */
 const EQUIVALENCIA_KG = /^\d{1,7}(\.\d{1,3})?$/;
@@ -45,6 +48,23 @@ export interface NuevaReferencia {
   /** En kilos. Acepta coma o punto decimal: «0,5» y «0.5» son medio kilo. */
   equivalenciaKg: string | number;
   creadaDesdeCelular?: boolean;
+}
+
+/**
+ * Lo que manda el celular al crear una presentación que no encuentra
+ * (SBA-23). `comandoId` lo genera el cliente (UUIDv7) y sirve de id
+ * provisional hasta que la API responde.
+ */
+export interface NuevaPresentacionDesdeCelular {
+  comandoId: string;
+  productoId: string;
+  presentacion: string;
+  equivalenciaKg: string | number;
+}
+
+export interface FiltroDeSimilares {
+  presentacion?: string;
+  equivalenciaKg?: string | number;
 }
 
 export interface FiltroDeReferencias {
@@ -161,6 +181,37 @@ export class ReferenciasService {
       equivalenciaKg: equivalenciaValida(nueva.equivalenciaKg),
       creadaDesdeCelular: nueva.creadaDesdeCelular ?? false,
     });
+  }
+
+  /**
+   * Alta desde el registro, sin aprobación previa: queda marcada para que la
+   * coordinación la revise (RF-M1-03). Solo presentaciones de un producto que
+   * ya existe; los productos los crea la coordinación.
+   */
+  async crearDesdeCelular(nueva: NuevaPresentacionDesdeCelular): Promise<AltaDesdeCelular> {
+    if (typeof nueva.comandoId !== 'string' || !UUID.test(nueva.comandoId)) {
+      throw new BadRequestException('El comando no es un UUID válido.');
+    }
+    return this.repositorio.crearDesdeCelular(nueva.comandoId.toLowerCase(), {
+      productoId: nueva.productoId,
+      presentacion: obligatorio(nueva.presentacion, 'la presentación', LARGO_DE_PRESENTACION),
+      equivalenciaKg: equivalenciaValida(nueva.equivalenciaKg),
+    });
+  }
+
+  /**
+   * Lo que el celular le muestra al operario antes de crear: «1000 g» puede
+   * ser el «1 kg» que ya existe con otro nombre.
+   */
+  async presentacionesSimilares(
+    productoId: string,
+    filtro: FiltroDeSimilares,
+  ): Promise<ReferenciaDelCatalogo[]> {
+    const presentacion = textoLimpio(filtro.presentacion ?? '') || null;
+    const kilos = String(filtro.equivalenciaKg ?? '').trim();
+    const equivalenciaKg = kilos ? equivalenciaValida(kilos) : null;
+    if (!presentacion && !equivalenciaKg) return [];
+    return this.repositorio.similares({ productoId, presentacion, equivalenciaKg });
   }
 
   async editarReferencia(

@@ -1,9 +1,17 @@
+import { randomUUID } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { AuditService, executeTransactionWithTenant, PrismaService } from '../../../core/index.js';
+import {
+  AuditService,
+  executeTransactionWithTenant,
+  IdempotenciaService,
+  PrismaService,
+} from '../../../core/index.js';
 import { contexto } from './contexto-de-tenant.js';
 import {
+  type AltaDesdeCelular,
   type BusquedaDeReferencias,
+  type BusquedaDeSimilares,
   type CambiosEnCategoria,
   type CambiosEnProducto,
   type CambiosEnReferencia,
@@ -90,6 +98,7 @@ export class ReferenciasPrismaRepositorio extends ReferenciasRepositorio {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditService,
+    private readonly idempotencia: IdempotenciaService,
   ) {
     super();
   }
@@ -288,6 +297,90 @@ export class ReferenciasPrismaRepositorio extends ReferenciasRepositorio {
       }),
     );
     return aReferencia(fila);
+  }
+
+  async crearDesdeCelular(
+    comandoId: string,
+    datos: Omit<DatosDeReferencia, 'creadaDesdeCelular'>,
+  ): Promise<AltaDesdeCelular> {
+    const { bancoId, actor } = contexto();
+    // El id se genera antes: la reserva del comando guarda el de la referencia.
+    const id = randomUUID();
+
+    return escribir(RECHAZOS_DE_REFERENCIA, () =>
+      executeTransactionWithTenant<AltaDesdeCelular>(this.prisma, async (tx) => {
+        const previo = await this.idempotencia.reclamar(tx, {
+          comandoId,
+          carga: datos,
+          resultado: { entidad: 'referencia', entidadId: id },
+        });
+        if (previo) {
+          const fila = await tx.referencia.findUniqueOrThrow({
+            where: { id: previo.entidadId },
+            select: COLUMNAS_DE_REFERENCIA,
+          });
+          return { referencia: aReferencia(fila), repetida: true };
+        }
+
+        await exigirProductoActivo(tx, bancoId, datos.productoId);
+        const fila = await tx.referencia.create({
+          data: {
+            ...datos,
+            id,
+            bancoId,
+            creadaDesdeCelular: true,
+            creadoPor: actor,
+            actualizadoPor: actor,
+          },
+          select: COLUMNAS_DE_REFERENCIA,
+        });
+        await this.auditoria.registrar(tx, {
+          accion: 'crear',
+          entidad: 'referencia',
+          entidadId: id,
+        });
+        return { referencia: aReferencia(fila), repetida: false };
+      }),
+    );
+  }
+
+  async similares({
+    productoId,
+    presentacion,
+    equivalenciaKg,
+  }: BusquedaDeSimilares): Promise<ReferenciaDelCatalogo[]> {
+    const { bancoId } = contexto();
+
+    return executeTransactionWithTenant<ReferenciaDelCatalogo[]>(this.prisma, async (tx) => {
+      const parecidas = [];
+      if (equivalenciaKg)
+        parecidas.push(Prisma.sql`r."equivalencia_kg" = ${equivalenciaKg}::numeric`);
+      if (presentacion) {
+        parecidas.push(Prisma.sql`(
+          strpos(inventario.normalizar(r."presentacion"), inventario.normalizar(${presentacion})) > 0
+          OR strpos(inventario.normalizar(${presentacion}), inventario.normalizar(r."presentacion")) > 0
+        )`);
+      }
+      if (parecidas.length === 0) return [];
+
+      const ids = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+        SELECT r."id"
+        FROM "inventario"."referencia" r
+        WHERE r."banco_id" = ${bancoId}::uuid
+          AND r."producto_id" = ${productoId}::uuid
+          AND r."activa"
+          AND (${Prisma.join(parecidas, ' OR ')})
+        ORDER BY r."equivalencia_kg", r."presentacion", r."id"
+      `);
+      if (ids.length === 0) return [];
+
+      const filas = await tx.referencia.findMany({
+        where: { bancoId, id: { in: ids.map(({ id }) => id) } },
+        orderBy: [{ equivalenciaKg: 'asc' }, { presentacion: 'asc' }, { id: 'asc' }],
+        select: COLUMNAS_DE_REFERENCIA,
+      });
+      return filas.map(aReferencia);
+    });
   }
 
   async actualizarReferencia(

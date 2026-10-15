@@ -15,22 +15,26 @@ import { Roles } from '../../../core/index.js';
 import {
   BuscarReferenciasDto,
   CrearCategoriaDto,
+  CrearDesdeCelularDto,
   CrearProductoDto,
   CrearReferenciaDto,
   EditarCategoriaDto,
   EditarProductoDto,
   EditarReferenciaDto,
+  PresentacionesSimilaresDto,
 } from '../dto/catalogo.dto.js';
 import { ReferenciasService } from '../services/referencias.service.js';
 
 const ROLES_DE_LECTURA = ['operario_bodega', 'voluntario', 'coordinacion', 'admin_banco'] as const;
 const ROLES_DE_ESCRITURA = ['coordinacion', 'admin_banco'] as const;
+/** Quien registra en bodega crea la presentación que no encuentra (SBA-23). */
+const ROLES_DEL_CELULAR = ['operario_bodega', 'coordinacion', 'admin_banco'] as const;
 
 /**
  * Catálogo por HTTP (SBA-22). Traduce HTTP a `ReferenciasService`; las reglas
  * viven en el servicio. Consultan bodega, voluntariado, coordinación y la
  * administración del banco; dar de alta, editar y desactivar es de coordinación
- * y administración. El alta desde el celular es de SBA-23.
+ * y administración. La bodega también crea presentaciones desde el celular (SBA-23).
  */
 @Controller()
 export class ReferenciasController {
@@ -112,6 +116,27 @@ export class ReferenciasController {
   @Post('referencias')
   crearReferencia(@Body() datos: CrearReferenciaDto) {
     return this.referencias.crearReferencia(datos);
+  }
+
+  /** 201 la primera vez; 200 con la misma referencia si el celular reenvía el comando. */
+  @Roles(...ROLES_DEL_CELULAR)
+  @Post('referencias/desde-celular')
+  async crearDesdeCelular(
+    @Body() nueva: CrearDesdeCelularDto,
+    @Res({ passthrough: true }) respuesta: Response,
+  ) {
+    const { referencia, repetida } = await this.referencias.crearDesdeCelular(nueva);
+    if (repetida) respuesta.status(200);
+    return referencia;
+  }
+
+  @Roles(...ROLES_DE_LECTURA)
+  @Get('productos/:id/presentaciones-similares')
+  presentacionesSimilares(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Query() filtro: PresentacionesSimilaresDto,
+  ) {
+    return this.referencias.presentacionesSimilares(id, filtro);
   }
 
   @Roles(...ROLES_DE_ESCRITURA)

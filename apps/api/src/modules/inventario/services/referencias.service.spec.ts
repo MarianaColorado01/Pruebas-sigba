@@ -1,7 +1,9 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  type AltaDesdeCelular,
   type BusquedaDeReferencias,
+  type BusquedaDeSimilares,
   type CambiosEnCategoria,
   type CambiosEnProducto,
   type CambiosEnReferencia,
@@ -27,6 +29,9 @@ class RepositorioEnMemoria extends ReferenciasRepositorio {
   referencias: ReferenciaDelCatalogo[] = [];
   arbol: CategoriaDelCatalogo[] = [];
   ultimaBusqueda?: BusquedaDeReferencias;
+  ultimosSimilares?: BusquedaDeSimilares;
+  /** Comandos ya procesados, como core.comando_procesado. */
+  comandos = new Map<string, ReferenciaDelCatalogo>();
 
   async buscar(busqueda: BusquedaDeReferencias): Promise<ReferenciaDelCatalogo[]> {
     this.ultimaBusqueda = busqueda;
@@ -71,6 +76,22 @@ class RepositorioEnMemoria extends ReferenciasRepositorio {
     };
     this.referencias.push(referencia);
     return referencia;
+  }
+
+  async crearDesdeCelular(
+    comandoId: string,
+    datos: Omit<DatosDeReferencia, 'creadaDesdeCelular'>,
+  ): Promise<AltaDesdeCelular> {
+    const previa = this.comandos.get(comandoId);
+    if (previa) return { referencia: previa, repetida: true };
+    const referencia = await this.crearReferencia({ ...datos, creadaDesdeCelular: true });
+    this.comandos.set(comandoId, referencia);
+    return { referencia, repetida: false };
+  }
+
+  async similares(busqueda: BusquedaDeSimilares): Promise<ReferenciaDelCatalogo[]> {
+    this.ultimosSimilares = busqueda;
+    return this.referencias;
   }
 
   async actualizarReferencia(id: string, cambios: CambiosEnReferencia) {
@@ -305,6 +326,92 @@ describe('ReferenciasService', () => {
 
       expect((await servicio.reactivarProducto(id)).activo).toBe(true);
       await expect(servicio.reactivarProducto('otro')).rejects.toThrow('No existe ese producto.');
+    });
+  });
+
+  describe('alta desde el celular (SBA-23)', () => {
+    const COMANDO = '01920000-0000-7000-8000-000000000001';
+
+    it('crea la presentación marcada para revisión, con la carga limpia', async () => {
+      const { referencia, repetida } = await servicio.crearDesdeCelular({
+        comandoId: COMANDO,
+        productoId: 'p-1',
+        presentacion: ' 480   g promocional ',
+        equivalenciaKg: '0,48',
+      });
+
+      expect(repetida).toBe(false);
+      expect(referencia).toMatchObject({
+        presentacion: '480 g promocional',
+        equivalenciaKg: '0.48',
+        creadaDesdeCelular: true,
+      });
+    });
+
+    it('el reenvío del mismo comando devuelve la misma referencia y no crea otra', async () => {
+      const comando = {
+        comandoId: COMANDO,
+        productoId: 'p-1',
+        presentacion: '480 g',
+        equivalenciaKg: '0.48',
+      };
+      const primera = await servicio.crearDesdeCelular(comando);
+      const segunda = await servicio.crearDesdeCelular(comando);
+
+      expect(segunda).toEqual({ referencia: primera.referencia, repetida: true });
+      expect(repositorio.referencias).toHaveLength(1);
+    });
+
+    it('acepta el comando en mayúsculas como el mismo comando', async () => {
+      const comando = { productoId: 'p-1', presentacion: '480 g', equivalenciaKg: '0.48' };
+      await servicio.crearDesdeCelular({ ...comando, comandoId: COMANDO });
+      const segunda = await servicio.crearDesdeCelular({
+        ...comando,
+        comandoId: COMANDO.toUpperCase(),
+      });
+
+      expect(segunda.repetida).toBe(true);
+    });
+
+    it.each([
+      [{ comandoId: 'no-es-uuid' }, 'El comando no es un UUID válido.'],
+      [{ presentacion: '   ' }, 'Falta la presentación.'],
+      [{ equivalenciaKg: '0' }, 'La equivalencia en kilos debe ser mayor que cero'],
+    ])('rechaza %o con 400', async (cambio, mensaje) => {
+      await expect(
+        servicio.crearDesdeCelular({
+          comandoId: COMANDO,
+          productoId: 'p-1',
+          presentacion: '480 g',
+          equivalenciaKg: '0.48',
+          ...cambio,
+        }),
+      ).rejects.toThrow(mensaje);
+      expect(repositorio.referencias).toHaveLength(0);
+    });
+
+    it('busca similares en el producto por presentación limpia y kilos normalizados', async () => {
+      await servicio.presentacionesSimilares('p-1', {
+        presentacion: '  1000   g ',
+        equivalenciaKg: '1,0',
+      });
+
+      expect(repositorio.ultimosSimilares).toEqual({
+        productoId: 'p-1',
+        presentacion: '1000 g',
+        equivalenciaKg: '1.0',
+      });
+    });
+
+    it('sin presentación ni kilos no hay nada que comparar', async () => {
+      await expect(servicio.presentacionesSimilares('p-1', {})).resolves.toEqual([]);
+      expect(repositorio.ultimosSimilares).toBeUndefined();
+    });
+
+    it('rechaza kilos inválidos al buscar similares', async () => {
+      await expect(
+        servicio.presentacionesSimilares('p-1', { equivalenciaKg: 'medio' }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

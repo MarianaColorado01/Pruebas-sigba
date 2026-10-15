@@ -74,6 +74,20 @@ export type CambiosEnReferencia = Partial<
   Omit<DatosDeReferencia, 'creadaDesdeCelular'> & { activa: boolean }
 >;
 
+/** El alta desde el celular y si el comando ya se había procesado (SBA-23). */
+export interface AltaDesdeCelular {
+  referencia: ReferenciaDelCatalogo;
+  /** El comando ya estaba: el controlador responde 200 con lo mismo y no 201. */
+  repetida: boolean;
+}
+
+/** Presentaciones del producto que podrían ser la que el operario va a crear. */
+export interface BusquedaDeSimilares {
+  productoId: string;
+  presentacion: string | null;
+  equivalenciaKg: string | null;
+}
+
 export interface BusquedaDeReferencias {
   /** Cada palabra tiene que aparecer en el producto, la presentación o el código. */
   palabras: string[];
@@ -108,6 +122,24 @@ export abstract class ReferenciasRepositorio {
   abstract actualizarProducto(id: string, cambios: CambiosEnProducto): Promise<Producto | null>;
 
   abstract crearReferencia(datos: DatosDeReferencia): Promise<ReferenciaDelCatalogo>;
+
+  /**
+   * Crea la presentación marcada `creada_desde_celular`, idempotente por
+   * `(banco_id, comandoId)`: la misma carga devuelve la referencia que ya
+   * creó y otra carga con el mismo comando sale como `ConflictException`
+   * (Arquitectura 6.1). Los demás rechazos, como `crearReferencia`.
+   */
+  abstract crearDesdeCelular(
+    comandoId: string,
+    datos: Omit<DatosDeReferencia, 'creadaDesdeCelular'>,
+  ): Promise<AltaDesdeCelular>;
+
+  /**
+   * Presentaciones activas del producto con la misma equivalencia, o cuyo
+   * nombre contiene al buscado o está contenido en él, sin distinguir
+   * mayúsculas ni tildes.
+   */
+  abstract similares(busqueda: BusquedaDeSimilares): Promise<ReferenciaDelCatalogo[]>;
 
   /** `null` si la referencia no existe en el banco del contexto. */
   abstract actualizarReferencia(
