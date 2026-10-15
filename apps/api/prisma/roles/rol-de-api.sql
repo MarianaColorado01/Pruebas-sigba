@@ -92,7 +92,7 @@ GRANT SELECT, INSERT, UPDATE ON inventario.producto TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON inventario.referencia TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON inventario.donante TO sigba_app;
 -- Recepción (SBA-24): se escribe una vez y no se edita. El UPDATE de
--- recepcion_detalle.valoracion lo agrega el maestro de precios (SBA-39).
+-- recepcion_detalle.valoracion lo agrega la valoración de recepciones (SBA-43).
 GRANT SELECT, INSERT ON inventario.recepcion TO sigba_app;
 GRANT SELECT, INSERT ON inventario.lote TO sigba_app;
 GRANT SELECT, INSERT ON inventario.recepcion_detalle TO sigba_app;
@@ -101,6 +101,9 @@ GRANT SELECT, INSERT ON inventario.movimiento TO sigba_app;
 -- El saldo se deriva del libro (SBA-35): lo escribe el trigger
 -- inventario.sumar_al_saldo con cada movimiento; la API solo lo lee.
 GRANT SELECT ON inventario.saldo TO sigba_app;
+-- Maestro de precios (SBA-39): el UPDATE aprueba o acorta la vigencia; el
+-- trigger de la tabla rechaza cualquier otro cambio.
+GRANT SELECT, INSERT, UPDATE ON inventario.precio TO sigba_app;
 
 -- beneficiarios
 GRANT SELECT, INSERT, UPDATE ON beneficiarios.tipo_poblacion TO sigba_app;

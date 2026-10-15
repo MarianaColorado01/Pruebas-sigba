@@ -211,6 +211,7 @@ model Referencia {
 
   producto Producto @relation(fields: [bancoId, productoId], references: [bancoId, id])
   lotes    Lote[]
+  precios  Precio[]
 
   @@unique([bancoId, id])
   // El UNIQUE (banco_id, producto_id, inventario.normalizar(presentacion)) vive
@@ -409,6 +410,57 @@ model Saldo {
   @@id([bancoId, bodegaId, loteId])
   @@index([bancoId, referenciaId])
   @@map("saldo")
+  @@schema("inventario")
+}
+
+enum FuentePrecio {
+  remision
+  sipsa
+  catalogo
+  manual
+
+  @@map("fuente_precio")
+  @@schema("inventario")
+}
+
+/// «Vencido» no se guarda: es un aprobado cuyo vigente_hasta ya pasó.
+enum EstadoPrecio {
+  propuesto
+  aprobado
+
+  @@map("estado_precio")
+  @@schema("inventario")
+}
+
+/// Precio por referencia genérica, en pesos por unidad de la presentación
+/// (SBA-39, ADR-13). Un trigger solo deja aprobar un propuesto o acortar la
+/// vigencia de un aprobado; sin DELETE. La exclusión que impide que dos
+/// aprobados de la misma referencia crucen vigencias vive en la migración
+/// 20261015130000: Prisma no expresa EXCLUDE.
+model Precio {
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoId            String       @map("banco_id") @db.Uuid
+  referenciaId       String       @map("referencia_id") @db.Uuid
+  valor              Decimal      @db.Decimal(14, 2)
+  piso               Decimal      @db.Decimal(14, 2)
+  techo              Decimal      @db.Decimal(14, 2)
+  fuente             FuentePrecio
+  evidencia          String
+  vigenteDesde       DateTime     @map("vigente_desde") @db.Date
+  vigenteHasta       DateTime?    @map("vigente_hasta") @db.Date
+  estado             EstadoPrecio @default(propuesto)
+  motivoFueraDeBanda String?      @map("motivo_fuera_de_banda")
+  aprobadoPor        String?      @map("aprobado_por") @db.VarChar(100)
+  aprobadoEn         DateTime?    @map("aprobado_en") @db.Timestamptz
+  creadoPor          String       @map("creado_por") @db.VarChar(100)
+  actualizadoPor     String       @map("actualizado_por") @db.VarChar(100)
+  creadoEn           DateTime     @default(now()) @map("creado_en") @db.Timestamptz
+  actualizadoEn      DateTime     @default(now()) @updatedAt @map("actualizado_en") @db.Timestamptz
+
+  referencia Referencia @relation(fields: [bancoId, referenciaId], references: [bancoId, id], onUpdate: Restrict)
+
+  @@index([bancoId, referenciaId, vigenteDesde])
+  @@map("precio")
   @@schema("inventario")
 }
 
