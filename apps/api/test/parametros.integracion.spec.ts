@@ -110,8 +110,8 @@ describe.skipIf(!URL_ADMIN)('Parámetros por banco contra PostgreSQL', () => {
     await admin.$executeRaw`INSERT INTO plataforma.red (id, nombre) VALUES (${redId}::uuid, 'SBA-20 integración')`;
     await admin.$executeRaw`
       INSERT INTO plataforma.banco (id, red_id, nombre, codigo)
-      VALUES (${bancoA}::uuid, ${redId}::uuid, 'SBA-20 banco A', ${`S20-${bancoA.slice(0, 12)}`}),
-             (${bancoB}::uuid, ${redId}::uuid, 'SBA-20 banco B', ${`S20-${bancoB.slice(0, 12)}`})`;
+      VALUES (${bancoA}::uuid, ${redId}::uuid, 'SBA-20 banco A', ${`S20-${bancoA.slice(0, 12).toUpperCase()}`}),
+             (${bancoB}::uuid, ${redId}::uuid, 'SBA-20 banco B', ${`S20-${bancoB.slice(0, 12).toUpperCase()}`})`;
     await admin.$executeRaw`
       INSERT INTO plataforma.usuario (id, emisor, auth0_sub, email, nombre, activo)
       VALUES (${usuarioA}::uuid, ${emisor}, ${`prueba|${usuarioA}`},
@@ -223,7 +223,7 @@ describe.skipIf(!URL_ADMIN)('Parámetros por banco contra PostgreSQL', () => {
       INSERT INTO plataforma.banco (id, red_id, nombre, codigo)
       VALUES (
         ${bancoId}::uuid, ${redId}::uuid, 'Banco para límites de vigencia',
-        ${`S20-${bancoId.slice(0, 12)}`}
+        ${`S20-${bancoId.slice(0, 12).toUpperCase()}`}
       )`;
     await runWithTenantContext({ bancoId, actor }, () =>
       servicio.actualizar(clave, 5, fechaInicio),
@@ -562,7 +562,7 @@ describe.skipIf(!URL_ADMIN)('Parámetros por banco contra PostgreSQL', () => {
       await admin.$executeRaw`
         INSERT INTO plataforma.banco (id, red_id, nombre, codigo)
         VALUES (${bancoId}::uuid, ${redId}::uuid, 'SBA-20 correcciones',
-                ${`S20-${bancoId.slice(0, 12)}`})`;
+                ${`S20-${bancoId.slice(0, 12).toUpperCase()}`})`;
       await admin.$executeRaw`
         INSERT INTO plataforma.usuario (id, emisor, auth0_sub, email, nombre, activo)
         VALUES (${usuarioId}::uuid, ${emisor}, ${`prueba|${usuarioId}`},
@@ -667,7 +667,7 @@ describe.skipIf(!URL_ADMIN)('Parámetros por banco contra PostgreSQL', () => {
       const bancoId = randomUUID();
       await admin.$executeRaw`
         INSERT INTO plataforma.banco (id, red_id, nombre, codigo)
-        VALUES (${bancoId}::uuid, ${redId}::uuid, ${nombre}, ${`S20-${bancoId.slice(0, 12)}`})`;
+        VALUES (${bancoId}::uuid, ${redId}::uuid, ${nombre}, ${`S20-${bancoId.slice(0, 12).toUpperCase()}`})`;
       return bancoId;
     }
 

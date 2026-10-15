@@ -1,6 +1,8 @@
 import { createBrowserRouter } from 'react-router';
 import { CatalogoPage } from '../features/inventario/CatalogoPage.tsx';
 import { StockPage } from '../features/inventario/StockPage.tsx';
+import { PantallaBancos } from '../features/plataforma/PantallaBancos.tsx';
+import { PantallaBodegas } from '../features/plataforma/PantallaBodegas.tsx';
 import { PantallaDeAuditoria } from '../features/plataforma/auditoria/PantallaDeAuditoria.tsx';
 import { Inicio } from './Inicio.tsx';
 
@@ -17,6 +19,9 @@ export const enrutador = createBrowserRouter([
     path: '/catalogo',
     element: <CatalogoPage />,
   },
+  // plataforma: bancos y bodegas (SBA-19)
+  { path: '/bancos', element: <PantallaBancos /> },
+  { path: '/bodegas', element: <PantallaBodegas /> },
   {
     path: '/stock',
     element: <StockPage />,

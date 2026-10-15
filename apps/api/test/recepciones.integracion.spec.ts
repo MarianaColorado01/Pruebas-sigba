@@ -215,7 +215,7 @@ describe.skipIf(!URL_ADMIN)('Recepción contra PostgreSQL (SBA-24)', () => {
     servicio = new RecepcionesService(
       repositorio,
       donantes,
-      new BodegasService(new BodegasPrismaRepositorio(prisma)),
+      new BodegasService(new BodegasPrismaRepositorio(prisma, auditoria)),
       referencias,
     );
   });

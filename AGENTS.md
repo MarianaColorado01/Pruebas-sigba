@@ -90,6 +90,10 @@ te va a dejar.
 - Toda escritura de negocio registra `(banco_id, comando_id)` y el hash de la carga.
   Misma carga: devuelve el resultado previo. Otra carga con la misma clave: 409
   (Arquitectura 6.1). El celular reenvía comandos; sin esta clave se duplica inventario.
+  Las escrituras administrativas que se hacen en línea desde la web (catálogo administrativo,
+  parámetros, bancos, bodegas, invitaciones) no llevan `comandoId`: se protegen con una llave
+  natural y un reenvío igual devuelve lo existente. Todo lo que pase por la cola offline del
+  celular sí lleva `comandoId`.
 - Sin precio vigente aprobado, la recepción confirma cantidades y queda con valoración
   pendiente. Nunca cero, nunca un precio vencido, nunca bloquear la recepción (ADR-13).
 - Datos personales de beneficiarios: documento cifrado y con HMAC por banco antes del

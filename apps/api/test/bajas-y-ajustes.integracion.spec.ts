@@ -181,7 +181,7 @@ describe.skipIf(!URL_ADMIN)('Bajas y ajustes contra PostgreSQL (SBA-42)', () => 
     // PrismaService es un PrismaClient; aquí va uno conectado con el rol de la app.
     const prisma = app as PrismaService;
     const auditoria = new AuditService();
-    const bodegas = new BodegasService(new BodegasPrismaRepositorio(prisma));
+    const bodegas = new BodegasService(new BodegasPrismaRepositorio(prisma, auditoria));
     catalogo = new ReferenciasService(
       new ReferenciasPrismaRepositorio(prisma, auditoria, new IdempotenciaService()),
     );

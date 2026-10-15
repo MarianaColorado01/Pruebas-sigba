@@ -171,7 +171,7 @@ describe.skipIf(!URL_ADMIN)(
       recepciones = new RecepcionesService(
         new RecepcionesPrismaRepositorio(prisma, new IdempotenciaService(), auditoria),
         donantes,
-        new BodegasService(new BodegasPrismaRepositorio(prisma)),
+        new BodegasService(new BodegasPrismaRepositorio(prisma, auditoria)),
         catalogo,
       );
       stock = new StockService(new StockPrismaRepositorio(prisma));

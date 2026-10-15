@@ -7,7 +7,8 @@ import { urlComoRolApp } from './rol-de-aplicacion.js';
  * Entidades globales: red, rol, banco y usuario (SBA-61, ADR-07, D14).
  *
  * `usuario` tiene RLS propia: cada quien ve su fila y la de quienes tienen una
- * asignación activa en el banco del contexto. Las demás son catálogos sin RLS.
+ * asignación activa en el banco del contexto. `banco` tiene RLS para que solo
+ * escriba super_admin (SBA-19). `red` y `rol` son catálogos sin RLS.
  * Todas están en `core.tabla_global`, y `core.verificar_politicas_rls` falla
  * con cualquier tabla que no tenga banco_id ni fila en ese registro.
  */
@@ -125,12 +126,14 @@ describe.skipIf(!URL_ADMIN)('Tablas globales contra PostgreSQL (SBA-61)', () => 
     expect(await usuariosVisibles({})).toEqual([]);
   });
 
-  it('la API no escribe en usuario, red, rol ni banco', async () => {
+  // banco sí se escribe: lo limitan sus políticas a super_admin (SBA-19), y
+  // eso lo prueba bancos-y-bodegas.integracion.spec.ts.
+  it('la API no escribe en usuario, red ni rol', async () => {
     const filas = await app.$queryRaw<{ tabla: string; escribe: boolean }[]>`
       SELECT t AS tabla,
              has_table_privilege(current_user, t, 'INSERT')
                OR has_table_privilege(current_user, t, 'UPDATE') AS escribe
-      FROM unnest(ARRAY['plataforma.usuario', 'plataforma.red', 'plataforma.rol', 'plataforma.banco']) AS t`;
+      FROM unnest(ARRAY['plataforma.usuario', 'plataforma.red', 'plataforma.rol']) AS t`;
 
     expect(filas.filter((f) => f.escribe)).toEqual([]);
   });
@@ -163,11 +166,9 @@ describe.skipIf(!URL_ADMIN)('Tablas globales contra PostgreSQL (SBA-61)', () => 
     ).rejects.toThrow(/prueba_global_rls necesita ROW LEVEL SECURITY/);
   });
 
-  it('pasar banco a rls sin ponerle RLS hace fallar la verificación', async () => {
+  it('quitarle el FORCE a banco, registrada como rls, hace fallar la verificación', async () => {
     await expect(
-      verificarCon(
-        `UPDATE core.tabla_global SET control = 'rls' WHERE esquema = 'plataforma' AND tabla = 'banco'`,
-      ),
+      verificarCon('ALTER TABLE plataforma.banco NO FORCE ROW LEVEL SECURITY'),
     ).rejects.toThrow(/banco necesita ROW LEVEL SECURITY/);
   });
 

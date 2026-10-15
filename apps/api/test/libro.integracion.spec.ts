@@ -175,7 +175,7 @@ describe.skipIf(!URL_ADMIN)('Libro de movimientos y saldo contra PostgreSQL (SBA
     recepciones = new RecepcionesService(
       new RecepcionesPrismaRepositorio(prisma, new IdempotenciaService(), auditoria),
       donantes,
-      new BodegasService(new BodegasPrismaRepositorio(prisma)),
+      new BodegasService(new BodegasPrismaRepositorio(prisma, auditoria)),
       catalogo,
     );
   });

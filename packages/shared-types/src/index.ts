@@ -88,6 +88,28 @@ export type ParametroListado = {
 export type ParametroHistorial = ParametroListado;
 
 /**
+ * Banco de la red, como lo devuelve `GET /bancos` (SBA-19, D11). El código va
+ * en mayúsculas y es único en la red.
+ */
+export interface BancoDto {
+  id: string;
+  nombre: string;
+  codigo: string;
+  activo: boolean;
+}
+
+/**
+ * Bodega de un banco, como la devuelve `GET /bodegas` (SBA-19, D10). Una
+ * bodega inactiva no se ofrece para movimientos nuevos, pero no se borra.
+ */
+export interface BodegaDto {
+  id: string;
+  nombre: string;
+  direccion: string | null;
+  activa: boolean;
+}
+
+/**
  * Acciones que registra `core.auditoria` (RNF-04). `leer` es una consulta de
  * datos personales: guarda qué conjunto y cuántas filas, nunca su contenido
  * (Arquitectura 8.6).

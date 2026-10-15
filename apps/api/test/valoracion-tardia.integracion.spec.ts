@@ -243,7 +243,7 @@ describe.skipIf(!URL_ADMIN)('Valoración tardía contra PostgreSQL (SBA-43)', ()
     recepciones = new RecepcionesService(
       new RecepcionesPrismaRepositorio(prisma, idempotencia, auditoria),
       donantes,
-      new BodegasService(new BodegasPrismaRepositorio(prisma)),
+      new BodegasService(new BodegasPrismaRepositorio(prisma, auditoria)),
       referencias,
     );
     precios = new PreciosService(new PreciosPrismaRepositorio(prisma, idempotencia, auditoria));

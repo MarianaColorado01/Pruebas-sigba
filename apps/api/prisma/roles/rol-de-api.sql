@@ -76,6 +76,12 @@ GRANT SELECT, INSERT ON plataforma.parametro_banco TO sigba_app;
 GRANT UPDATE (fecha_fin, valor) ON plataforma.parametro_banco TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON plataforma.usuario_rol TO sigba_app;
 
+-- plataforma: altas y ediciones de bancos (SBA-19). Solo super_admin escribe:
+-- lo comprueban las políticas banco_alta y banco_edicion. La red y el id no
+-- se cambian.
+GRANT INSERT ON plataforma.banco TO sigba_app;
+GRANT UPDATE (nombre, codigo, activo, actualizado_en) ON plataforma.banco TO sigba_app;
+
 -- core: auditoría append-only. Se lee por RLS y se escribe solo con
 -- core.registrar_auditoria (sección 4).
 GRANT SELECT ON core.auditoria TO sigba_app;
@@ -134,6 +140,9 @@ GRANT EXECUTE ON FUNCTION core.reclamar_comando(uuid, smallint, text, text, uuid
 
 -- Outbox transaccional (SBA-30).
 GRANT EXECUTE ON FUNCTION core.emitir_evento(text, smallint, jsonb) TO sigba_app;
+
+-- Comprobación de super_admin en las políticas de banco (SBA-19).
+GRANT EXECUTE ON FUNCTION plataforma.actua_como_super_admin() TO sigba_app;
 
 -- inventario.sumar_al_saldo (SBA-35) no lleva GRANT: la ejecuta el trigger
 -- del libro, y Postgres no revisa EXECUTE cuando dispara un trigger.

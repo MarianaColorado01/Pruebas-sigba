@@ -9,11 +9,18 @@ import { ParametrosRepositorio } from './services/parametros.repositorio.js';
 import { ParametrosController } from './controllers/parametros.controller.js';
 import { UsuariosPrismaRepositorio } from './repositories/usuarios.prisma.repositorio.js';
 import { AuditoriaRepositorio } from './services/auditoria.js';
-import { BodegasRepositorio } from './services/bodega.js';
+import { AdministracionDeBodegasRepositorio, BodegasRepositorio } from './services/bodega.js';
 import { BodegasService } from './services/bodegas.service.js';
 import { ConsultaDeAuditoriaService } from './services/consulta-de-auditoria.service.js';
 import { UsuariosRepositorio } from './services/usuario.js';
 import { UsuariosService } from './services/usuarios.service.js';
+// Bancos y bodegas (SBA-19)
+import { BancosController } from './controllers/bancos.controller.js';
+import { BodegasController } from './controllers/bodegas.controller.js';
+import { BancosPrismaRepositorio } from './repositories/bancos.prisma.repositorio.js';
+import { AdministracionDeBancosService } from './services/administracion-de-bancos.service.js';
+import { AdministracionDeBodegasService } from './services/administracion-de-bodegas.service.js';
+import { BancosRepositorio } from './services/banco.js';
 
 /**
  * Plataforma · Equipo 3
@@ -26,7 +33,13 @@ import { UsuariosService } from './services/usuarios.service.js';
  */
 @Module({
   imports: [],
-  controllers: [ParametrosController, AuditoriaController],
+  controllers: [
+    AuditoriaController,
+    ParametrosController,
+    // Bancos y bodegas (SBA-19)
+    BancosController,
+    BodegasController,
+  ],
   providers: [
     ConsultaDeAuditoriaService,
     { provide: AuditoriaRepositorio, useClass: AuditoriaPrismaRepositorio },
@@ -38,6 +51,12 @@ import { UsuariosService } from './services/usuarios.service.js';
     { provide: ParametrosRepositorio, useClass: ParametrosPrismaRepositorio },
     { provide: ParametrosLectura, useExisting: ParametrosService },
     { provide: RESOLUTOR_DE_IDENTIDAD, useExisting: UsuariosService },
+    // Bancos y bodegas (SBA-19)
+    AdministracionDeBancosService,
+    { provide: BancosRepositorio, useClass: BancosPrismaRepositorio },
+    AdministracionDeBodegasService,
+    // El mismo adaptador sirve la lectura de otros módulos y la administración.
+    { provide: AdministracionDeBodegasRepositorio, useExisting: BodegasRepositorio },
   ],
   exports: [BodegasService, RESOLUTOR_DE_IDENTIDAD, ParametrosLectura],
 })

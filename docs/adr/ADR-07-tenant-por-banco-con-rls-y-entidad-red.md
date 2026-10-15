@@ -34,10 +34,12 @@ La entidad red no habilita consultas nominales entre bancos.
 
 Los permisos propios de las entidades globales quedan así:
 
-- `red`, `rol` y `banco` no tienen RLS. Son catálogos sin `banco_id` ni datos
-  personales: la red ABACO, los roles de Arquitectura 8.2 y el nombre y código
-  de cada banco. La API los lee con `GRANT SELECT` y solo escribe en ellos con
-  una línea explícita en `rol-de-api.sql`.
+- `red` y `rol` no tienen RLS. Son catálogos sin `banco_id` ni datos
+  personales: la red ABACO y los roles de Arquitectura 8.2. La API los lee con
+  `GRANT SELECT` y solo escribe en ellos con una línea explícita en
+  `rol-de-api.sql`.
+- `banco` tiene RLS forzada (SBA-19). Cualquiera lee su nombre y código; solo
+  escribe `super_admin`, con `app.banco_id` igual al banco escrito (D7).
 - `usuario` tiene RLS forzada. La API ve la fila propia (`app.usuario_id`) y
   la de quien tenga una asignación activa en `app.banco_id`. Una persona que
   solo está en el banco B no aparece para el banco A.
@@ -47,5 +49,5 @@ Los permisos propios de las entidades globales quedan así:
   migración, igual que una registrada como `rls` sin RLS forzada y política, o
   una que dé privilegios a `PUBLIC`.
 - Una tabla global nueva entra al registro con un `INSERT` en la migración que
-  la crea, y cambiar su control es un `UPDATE`; la función no se toca.
-  `sba-19-bancos-y-bodegas` pasa `banco` a `rls` cuando le pone RLS (D7).
+  la crea, y cambiar su control es un `UPDATE`; la función no se toca. Así
+  pasó `banco` de `catalogo` a `rls` en SBA-19.

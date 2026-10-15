@@ -10,12 +10,12 @@
  *   pnpm --filter @sigba/api exec prisma db seed
  *
  * Solo datos sintéticos (Arquitectura 7.1). Es idempotente: correrla dos
- * veces deja lo mismo. Cuando Equipo 3 tenga su propia semilla de
- * plataforma, la red y el banco de aquí se reemplazan por los suyos.
+ * veces deja lo mismo. El banco cuelga de la red ABACO, que crea la migración
+ * de SBA-19 con id fijo (D12 de docs/arquitectura/plataforma-sba-19.md).
  */
 import { PrismaClient } from '@prisma/client';
 
-const RED_ID = '00000000-0000-4000-8000-000000000001';
+const RED_ABACO = '00000000-0000-4000-8000-00000000abac';
 const BANCO_ID = '00000000-0000-4000-8000-000000000002';
 
 /**
@@ -91,16 +91,12 @@ const TIPOS_DE_POBLACION = ['Familias', 'Adultos mayores', 'Habitantes de calle'
 const prisma = new PrismaClient();
 
 async function sembrar(): Promise<void> {
-  // red y banco son de plataforma y no tienen RLS por banco.
-  await prisma.red.upsert({
-    where: { id: RED_ID },
-    update: {},
-    create: { id: RED_ID, nombre: 'Red sintética' },
-  });
+  // El dueño de las tablas escribe bancos por la política banco_administracion.
+  // `update` mueve a ABACO un banco sembrado antes con la red sintética.
   await prisma.banco.upsert({
     where: { id: BANCO_ID },
-    update: {},
-    create: { id: BANCO_ID, redId: RED_ID, nombre: 'Banco sintético', codigo: 'SINT' },
+    update: { redId: RED_ABACO },
+    create: { id: BANCO_ID, redId: RED_ABACO, nombre: 'Banco sintético', codigo: 'SINT' },
   });
 
   // El catálogo tiene FORCE RLS: sin contexto de banco, ni el dueño de las
