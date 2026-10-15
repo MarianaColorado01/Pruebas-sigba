@@ -57,6 +57,13 @@ export class DonantesService {
     });
   }
 
+  /** Lo que pide la recepción: que el donante exista en el banco y esté activo. */
+  async obtenerActivo(id: string): Promise<Donante> {
+    const [donante] = await this.repositorio.buscar({ id, soloActivos: true, limite: 1 });
+    if (!donante) throw new NotFoundException('No existe ese donante o está desactivado.');
+    return donante;
+  }
+
   async editar(id: string, edicion: EdicionDeDonante): Promise<Donante> {
     const cambios: CambiosEnDonante = {};
     if (edicion.nombre !== undefined) cambios.nombre = nombreValido(edicion.nombre);

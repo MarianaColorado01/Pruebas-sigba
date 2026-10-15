@@ -104,6 +104,21 @@ export class ReferenciasService {
   }
 
   /**
+   * Las que se pueden recibir: activas y con producto y categoría activos,
+   * igual que en la búsqueda. Las demás no vienen, sin distinguir si no
+   * existen, están desactivadas o son de otro banco.
+   */
+  async activasPorId(ids: string[]): Promise<ReferenciaDelCatalogo[]> {
+    const unicas = [...new Set(ids)];
+    return this.repositorio.buscar({
+      palabras: [],
+      ids: unicas,
+      soloActivas: true,
+      limite: unicas.length,
+    });
+  }
+
+  /**
    * El catálogo activo para la caché de la PWA. La versión es un hash del
    * contenido: sirve de ETag y no depende de relojes ni de contadores.
    */

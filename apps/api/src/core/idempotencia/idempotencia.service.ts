@@ -89,13 +89,39 @@ export class IdempotenciaService {
     `;
     if (!fila) throw new Error('core.reclamar_comando no devolvió la fila del comando.');
     if (fila.nuevo) return null;
-
-    if (
-      fila.entidad !== resultado.entidad ||
-      fila.cargaHash !== hashDeCarga(fila.cargaHashVersion, carga)
-    ) {
-      throw new ConflictException('Este comando ya se procesó con otra carga.');
-    }
-    return { entidad: fila.entidad, entidadId: fila.entidadId };
+    return resultadoPrevio(fila, resultado.entidad, carga);
   }
+
+  /**
+   * Lee sin reservar. Sirve cuando una validación previa a la escritura falla
+   * (por ejemplo, una referencia que se desactivó después del primer envío):
+   * si el comando ya se procesó con la misma carga, el reenvío debe recibir el
+   * resultado original y no el error. Devuelve `null` si el banco no lo tiene;
+   * con otra carga, 409.
+   */
+  async consultar(
+    tx: Prisma.TransactionClient,
+    { comandoId, carga, entidad }: Omit<ComandoAReclamar, 'resultado'> & { entidad: string },
+  ): Promise<ResultadoDeComando | null> {
+    const [fila] = await tx.$queryRaw<Omit<FilaReclamada, 'nuevo'>[]>`
+      SELECT carga_hash_version AS "cargaHashVersion",
+             carga_hash AS "cargaHash",
+             entidad,
+             entidad_id::text AS "entidadId"
+      FROM core.comando_procesado
+      WHERE comando_id = ${comandoId}::uuid
+    `;
+    return fila ? resultadoPrevio(fila, entidad, carga) : null;
+  }
+}
+
+function resultadoPrevio(
+  fila: Omit<FilaReclamada, 'nuevo'>,
+  entidad: string,
+  carga: unknown,
+): ResultadoDeComando {
+  if (fila.entidad !== entidad || fila.cargaHash !== hashDeCarga(fila.cargaHashVersion, carga)) {
+    throw new ConflictException('Este comando ya se procesó con otra carga.');
+  }
+  return { entidad: fila.entidad, entidadId: fila.entidadId };
 }

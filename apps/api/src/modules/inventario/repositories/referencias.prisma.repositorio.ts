@@ -105,17 +105,25 @@ export class ReferenciasPrismaRepositorio extends ReferenciasRepositorio {
 
   async buscar({
     palabras,
+    ids,
     categoriaId,
     soloActivas,
     limite,
   }: BusquedaDeReferencias): Promise<ReferenciaDelCatalogo[]> {
     const { bancoId } = contexto();
+    if (ids?.length === 0) return [];
 
     return executeTransactionWithTenant<ReferenciaDelCatalogo[]>(this.prisma, async (tx) => {
       // Prisma no compara con una función de la base, así que el filtro va en
       // SQL con la misma normalización de los índices únicos: «arroz» encuentra
       // «Arróz».
       const filtros = [Prisma.sql`r."banco_id" = ${bancoId}::uuid`];
+      // Solo estas referencias: así valida la recepción sus filas (SBA-24).
+      if (ids) {
+        filtros.push(
+          Prisma.sql`r."id" IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))})`,
+        );
+      }
       if (soloActivas) filtros.push(Prisma.sql`r."activa" AND p."activo" AND c."activa"`);
       if (categoriaId) filtros.push(Prisma.sql`p."categoria_id" = ${categoriaId}::uuid`);
       for (const palabra of palabras) {

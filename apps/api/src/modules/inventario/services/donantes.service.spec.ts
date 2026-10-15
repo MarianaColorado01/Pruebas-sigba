@@ -23,7 +23,10 @@ class RepositorioEnMemoria extends DonantesRepositorio {
   async buscar(busqueda: BusquedaDeDonantes): Promise<Donante[]> {
     this.ultimaBusqueda = busqueda;
     return this.donantes.filter(
-      (d) => (!busqueda.tipo || d.tipo === busqueda.tipo) && (!busqueda.soloActivos || d.activo),
+      (d) =>
+        (!busqueda.id || d.id === busqueda.id) &&
+        (!busqueda.tipo || d.tipo === busqueda.tipo) &&
+        (!busqueda.soloActivos || d.activo),
     );
   }
 
@@ -192,6 +195,25 @@ describe('DonantesService', () => {
 
     it('responde 404 si el donante no existe o es de otro banco', async () => {
       await expect(servicio.desactivar('no-existe')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('obtenerActivo', () => {
+    it('devuelve el donante activo que pide la recepción', async () => {
+      const { id } = await servicio.crear({ nombre: 'Supermercado La 14', tipo: 'empresa' });
+
+      expect((await servicio.obtenerActivo(id)).nombre).toBe('Supermercado La 14');
+      expect(repositorio.ultimaBusqueda).toEqual({ id, soloActivos: true, limite: 1 });
+    });
+
+    it('responde 404 si el donante no existe o está desactivado', async () => {
+      const { id } = await servicio.crear({ nombre: 'Juan', tipo: 'particular' });
+      await servicio.desactivar(id);
+
+      await expect(servicio.obtenerActivo(id)).rejects.toThrow(
+        'No existe ese donante o está desactivado.',
+      );
+      await expect(servicio.obtenerActivo('no-existe')).rejects.toThrow(NotFoundException);
     });
   });
 });

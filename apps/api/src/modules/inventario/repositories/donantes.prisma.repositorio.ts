@@ -42,10 +42,11 @@ export class DonantesPrismaRepositorio extends DonantesRepositorio {
     });
   }
 
-  async buscar({ texto, tipo, soloActivos, limite }: BusquedaDeDonantes): Promise<Donante[]> {
+  async buscar({ id, texto, tipo, soloActivos, limite }: BusquedaDeDonantes): Promise<Donante[]> {
     return executeTransactionWithTenant<Donante[]>(this.prisma, (tx) =>
       tx.donante.findMany({
         where: {
+          ...(id && { id }),
           ...(texto && { nombre: { contains: texto, mode: 'insensitive' as const } }),
           ...(tipo && { tipo }),
           ...(soloActivos && { activo: true }),

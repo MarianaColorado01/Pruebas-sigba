@@ -24,6 +24,7 @@ export type DatosDeDonante = Pick<Donante, 'nombre' | 'tipo' | 'contacto'>;
 export type CambiosEnDonante = Partial<Omit<Donante, 'id'>>;
 
 export interface BusquedaDeDonantes {
+  id?: string;
   texto?: string;
   tipo?: TipoDonante;
   soloActivos: boolean;

@@ -83,4 +83,33 @@ describe('IdempotenciaService', () => {
   it('falla si la función no devuelve fila', async () => {
     await expect(reclamar(txQueDevuelve(undefined))).rejects.toThrow(/no devolvió/);
   });
+
+  describe('consultar', () => {
+    const consultar = (tx: object, cargaEnviada: unknown = carga) =>
+      new IdempotenciaService().consultar(tx as never, {
+        comandoId: COMANDO,
+        carga: cargaEnviada,
+        entidad: 'recepcion',
+      });
+
+    it('sin fila devuelve null y no reserva nada', async () => {
+      const tx = txQueDevuelve(undefined);
+
+      await expect(consultar(tx)).resolves.toBeNull();
+      expect(String(tx.$queryRaw.mock.calls[0]?.[0])).not.toMatch(/reclamar_comando/);
+    });
+
+    it('con la misma carga devuelve el resultado guardado', async () => {
+      await expect(consultar(txQueDevuelve(previa()))).resolves.toEqual({
+        entidad: 'recepcion',
+        entidadId: RECEPCION,
+      });
+    });
+
+    it('con otra carga responde 409', async () => {
+      await expect(
+        consultar(txQueDevuelve(previa()), { ...carga, donanteId: 'd2' }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
 });

@@ -136,6 +136,19 @@ describe('ReferenciasService', () => {
     });
   });
 
+  describe('activasPorId', () => {
+    it('pide solo esas referencias, activas y sin repetir, para validar una recepción', async () => {
+      await servicio.activasPorId(['r-1', 'r-2', 'r-1']);
+
+      expect(repositorio.ultimaBusqueda).toEqual({
+        palabras: [],
+        ids: ['r-1', 'r-2'],
+        soloActivas: true,
+        limite: 2,
+      });
+    });
+  });
+
   describe('catalogo', () => {
     const arroz: CategoriaDelCatalogo = {
       id: 'c-1',

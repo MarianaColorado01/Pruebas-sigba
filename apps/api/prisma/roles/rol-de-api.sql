@@ -91,6 +91,13 @@ GRANT SELECT, INSERT, UPDATE ON inventario.categoria TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON inventario.producto TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON inventario.referencia TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON inventario.donante TO sigba_app;
+-- Recepción (SBA-24): se escribe una vez y no se edita. El UPDATE de
+-- recepcion_detalle.valoracion lo agrega el maestro de precios (SBA-39).
+GRANT SELECT, INSERT ON inventario.recepcion TO sigba_app;
+GRANT SELECT, INSERT ON inventario.lote TO sigba_app;
+GRANT SELECT, INSERT ON inventario.recepcion_detalle TO sigba_app;
+-- El libro es append-only (ADR-08).
+GRANT SELECT, INSERT ON inventario.movimiento TO sigba_app;
 
 -- beneficiarios
 GRANT SELECT, INSERT, UPDATE ON beneficiarios.tipo_poblacion TO sigba_app;

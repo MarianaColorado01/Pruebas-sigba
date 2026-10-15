@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { RESOLUTOR_DE_IDENTIDAD } from '../../core/index.js';
+import { BodegasPrismaRepositorio } from './repositories/bodegas.prisma.repositorio.js';
 import { UsuariosPrismaRepositorio } from './repositories/usuarios.prisma.repositorio.js';
+import { BodegasRepositorio } from './services/bodega.js';
+import { BodegasService } from './services/bodegas.service.js';
 import { UsuariosRepositorio } from './services/usuario.js';
 import { UsuariosService } from './services/usuarios.service.js';
 
@@ -15,10 +18,12 @@ import { UsuariosService } from './services/usuarios.service.js';
   imports: [],
   controllers: [],
   providers: [
+    BodegasService,
+    { provide: BodegasRepositorio, useClass: BodegasPrismaRepositorio },
     UsuariosService,
     { provide: UsuariosRepositorio, useClass: UsuariosPrismaRepositorio },
     { provide: RESOLUTOR_DE_IDENTIDAD, useExisting: UsuariosService },
   ],
-  exports: [RESOLUTOR_DE_IDENTIDAD],
+  exports: [BodegasService, RESOLUTOR_DE_IDENTIDAD],
 })
 export class PlataformaModule {}

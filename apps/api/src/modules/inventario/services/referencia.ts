@@ -91,6 +91,8 @@ export interface BusquedaDeSimilares {
 export interface BusquedaDeReferencias {
   /** Cada palabra tiene que aparecer en el producto, la presentación o el código. */
   palabras: string[];
+  /** Solo estas referencias, para validar las filas de una recepción. */
+  ids?: string[];
   categoriaId?: string;
   soloActivas: boolean;
   limite: number;
