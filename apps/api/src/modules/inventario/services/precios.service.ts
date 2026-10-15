@@ -17,8 +17,11 @@ import {
  */
 export const DIAS_DE_VIGENCIA = 30;
 
-/** El calendario del Banco: el día cambia a medianoche en Colombia, no en UTC. */
-const ZONA_DEL_BANCO = 'America/Bogota';
+/**
+ * El calendario del Banco: el día cambia a medianoche en Colombia, no en UTC.
+ * Los adaptadores lo usan para el día de una recepción.
+ */
+export const ZONA_DEL_BANCO = 'America/Bogota';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

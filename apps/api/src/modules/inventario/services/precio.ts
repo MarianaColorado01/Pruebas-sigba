@@ -118,9 +118,11 @@ export abstract class PreciosRepositorio {
 
   /**
    * Reclama el comando y, si es nuevo, aprueba el precio propuesto, cierra el
-   * aprobado anterior de la misma referencia que se cruce con su vigencia y
-   * audita ambos cambios, en una transacción. Un precio ya aprobado, o una
-   * vigencia que choca con un aprobado que no se puede cerrar, es 409.
+   * aprobado anterior de la misma referencia que se cruce con su vigencia,
+   * valora las entradas pendientes de la referencia recibidas dentro de la
+   * vigencia (SBA-43) y audita todo, en una transacción. La valoración es una
+   * fila aparte: el movimiento no cambia. Un precio ya aprobado, o una vigencia
+   * que choca con un aprobado que no se puede cerrar, es 409.
    */
   abstract aprobar(datos: DatosDeAprobacion): Promise<PrecioRegistrado>;
 

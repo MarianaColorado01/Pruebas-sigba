@@ -15,6 +15,7 @@ import {
   type PrecioRegistrado,
   PreciosRepositorio,
 } from '../services/precio.js';
+import { bloquearReferencias, valorarPendientes } from './valoracion.js';
 
 const COLUMNAS = {
   id: true,
@@ -115,14 +116,17 @@ export class PreciosPrismaRepositorio extends PreciosRepositorio {
 
         // FOR UPDATE: dos aprobaciones del mismo precio con comandos distintos
         // se ponen en fila, y la segunda ve que ya está aprobado.
-        const [actual] = await tx.$queryRaw<{ estado: string }[]>`
-          SELECT estado::text FROM inventario.precio
+        const [actual] = await tx.$queryRaw<{ estado: string; referenciaId: string }[]>`
+          SELECT estado::text, referencia_id::text AS "referenciaId" FROM inventario.precio
           WHERE id = ${precioId}::uuid AND banco_id = ${bancoId}::uuid
           FOR UPDATE`;
         if (!actual) throw new NotFoundException('No existe ese precio.');
         if (actual.estado !== 'propuesto') {
           throw new ConflictException('Ese precio ya está aprobado.');
         }
+        // Espera a las recepciones de la referencia que estén en curso, para
+        // valorarlas también (ver bloquearReferencias).
+        await bloquearReferencias(tx, bancoId, [actual.referenciaId], 'aprobacion');
 
         // El aprobado anterior que se cruce termina el día antes de que empiece
         // este, y queda en el historial.
@@ -165,8 +169,16 @@ export class PreciosPrismaRepositorio extends PreciosRepositorio {
             detalle: { camposModificados: ['vigente_hasta'] },
           });
         }
+
+        // Valoración tardía (SBA-43): las entradas pendientes de la referencia
+        // recibidas dentro de la vigencia quedan valoradas con este precio. Va
+        // después de aprobar, con la vigencia ya definitiva.
+        await valorarPendientes(tx, this.auditoria, { bancoId, actor }, { precioId });
+
         // PrecioActualizado va aquí, con este mismo `tx`, cuando exista el
-        // outbox (SBA-30).
+        // outbox (SBA-30). Lleva lo que el reporte de ingresos de M3 necesita
+        // de la valoración tardía; esa carga la acuerdan los capitanes de los
+        // equipos 2 y 3 antes de escribir el consumidor.
 
         return { precio: await leer(tx, precioId), repetida: false };
       });

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PlataformaModule } from '../plataforma/index.js';
 import { BajasYAjustesController } from './controllers/bajas-y-ajustes.controller.js';
+import { IngresosController } from './controllers/ingresos.controller.js';
 import { PreciosController } from './controllers/precios.controller.js';
 import { RecepcionesController } from './controllers/recepciones.controller.js';
 import { ReferenciasController } from './controllers/referencias.controller.js';
@@ -8,6 +9,7 @@ import { StockController } from './controllers/stock.controller.js';
 import { BajasYAjustesPrismaRepositorio } from './repositories/bajas-y-ajustes.prisma.repositorio.js';
 import { CategoriasPrismaRepositorio } from './repositories/categorias.prisma.repositorio.js';
 import { DonantesPrismaRepositorio } from './repositories/donantes.prisma.repositorio.js';
+import { IngresosPrismaRepositorio } from './repositories/ingresos.prisma.repositorio.js';
 import { PreciosPrismaRepositorio } from './repositories/precios.prisma.repositorio.js';
 import { RecepcionesPrismaRepositorio } from './repositories/recepciones.prisma.repositorio.js';
 import { ReferenciasPrismaRepositorio } from './repositories/referencias.prisma.repositorio.js';
@@ -18,6 +20,8 @@ import { CategoriasRepositorio } from './services/categoria.js';
 import { DonantesRepositorio } from './services/donante.js';
 import { DonantesService } from './services/donantes.service.js';
 import { ImportacionCatalogoService } from './services/importacion-catalogo.service.js';
+import { IngresosRepositorio } from './services/ingreso.js';
+import { IngresosService } from './services/ingresos.service.js';
 import { PreciosRepositorio } from './services/precio.js';
 import { PreciosService } from './services/precios.service.js';
 import { RecepcionesRepositorio } from './services/recepcion.js';
@@ -38,6 +42,7 @@ import { StockService } from './services/stock.service.js';
   imports: [PlataformaModule],
   controllers: [
     BajasYAjustesController,
+    IngresosController,
     PreciosController,
     RecepcionesController,
     ReferenciasController,
@@ -56,6 +61,8 @@ import { StockService } from './services/stock.service.js';
     { provide: BajasYAjustesRepositorio, useClass: BajasYAjustesPrismaRepositorio },
     PreciosService,
     { provide: PreciosRepositorio, useClass: PreciosPrismaRepositorio },
+    IngresosService,
+    { provide: IngresosRepositorio, useClass: IngresosPrismaRepositorio },
     StockService,
     { provide: StockRepositorio, useClass: StockPrismaRepositorio },
   ],

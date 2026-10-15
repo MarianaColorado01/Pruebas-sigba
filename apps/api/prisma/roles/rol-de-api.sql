@@ -91,11 +91,14 @@ GRANT SELECT, INSERT, UPDATE ON inventario.categoria TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON inventario.producto TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON inventario.referencia TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON inventario.donante TO sigba_app;
--- Recepción (SBA-24): se escribe una vez y no se edita. El UPDATE de
--- recepcion_detalle.valoracion lo agrega la valoración de recepciones (SBA-43).
+-- Recepción (SBA-24): se escribe una vez y no se edita. Del detalle solo
+-- cambia la valoración, con quién y cuándo (SBA-43): UPDATE por columna, y el
+-- trigger no la deja volver a pendiente. Revocar la tabla en la sección 2
+-- revoca también estas columnas.
 GRANT SELECT, INSERT ON inventario.recepcion TO sigba_app;
 GRANT SELECT, INSERT ON inventario.lote TO sigba_app;
 GRANT SELECT, INSERT ON inventario.recepcion_detalle TO sigba_app;
+GRANT UPDATE (valoracion, actualizado_por, actualizado_en) ON inventario.recepcion_detalle TO sigba_app;
 -- El libro es append-only (ADR-08).
 GRANT SELECT, INSERT ON inventario.movimiento TO sigba_app;
 -- El saldo se deriva del libro (SBA-35): lo escribe el trigger
@@ -104,6 +107,8 @@ GRANT SELECT ON inventario.saldo TO sigba_app;
 -- Maestro de precios (SBA-39): el UPDATE aprueba o acorta la vigencia; el
 -- trigger de la tabla rechaza cualquier otro cambio.
 GRANT SELECT, INSERT, UPDATE ON inventario.precio TO sigba_app;
+-- Valoración tardía (SBA-43): append-only, como el libro (ADR-08).
+GRANT SELECT, INSERT ON inventario.valoracion TO sigba_app;
 -- El motivo de cada baja y cada ajuste (SBA-42): append-only, como su movimiento.
 GRANT SELECT, INSERT ON inventario.baja TO sigba_app;
 GRANT SELECT, INSERT ON inventario.ajuste TO sigba_app;

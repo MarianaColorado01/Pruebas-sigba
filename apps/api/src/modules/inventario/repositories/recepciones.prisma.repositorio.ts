@@ -9,6 +9,7 @@ import {
 } from '../../../core/index.js';
 import { contexto } from './contexto-de-tenant.js';
 import { escribirEnLibro } from './libro.js';
+import { bloquearReferencias, valorarPendientes } from './valoracion.js';
 import {
   type CargaDeRecepcion,
   type DatosDeRecepcion,
@@ -93,6 +94,15 @@ export class RecepcionesPrismaRepositorio extends RecepcionesRepositorio {
           return { recepcion: aRecepcion(fila), repetida: true };
         }
 
+        // Una aprobación de precio de estas referencias que esté en curso
+        // termina antes, y su precio entra en la valoración de abajo.
+        await bloquearReferencias(
+          tx,
+          bancoId,
+          filas.map((f) => f.referenciaId),
+          'recepcion',
+        );
+
         await tx.recepcion.createMany({
           data: [{ id: recepcionId, bancoId, ...cabecera, creadoPor: actor }],
         });
@@ -123,7 +133,9 @@ export class RecepcionesPrismaRepositorio extends RecepcionesRepositorio {
             creadoPor: actor,
           })),
         );
-        // Sin valoración: la columna nace pendiente, nunca en cero (ADR-13).
+        // El detalle nace pendiente y se valora enseguida si la referencia
+        // tiene precio aprobado vigente hoy; si no, queda pendiente, nunca en
+        // cero (ADR-13).
         await tx.recepcionDetalle.createMany({
           data: filas.map((f, orden) => ({
             bancoId,
@@ -135,6 +147,7 @@ export class RecepcionesPrismaRepositorio extends RecepcionesRepositorio {
             actualizadoPor: actor,
           })),
         });
+        await valorarPendientes(tx, this.auditoria, { bancoId, actor }, { recepcionId });
         await this.auditoria.registrar(tx, {
           accion: 'crear',
           entidad: 'recepcion',

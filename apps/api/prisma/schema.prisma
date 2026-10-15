@@ -269,9 +269,11 @@ enum NovedadRecepcion {
 }
 
 /// Sin precio vigente aprobado la fila queda pendiente: nunca en cero (ADR-13).
-/// El valor aprobado llega con el maestro de precios (SBA-39).
+/// Pasa a con_precio cuando se aprueba un precio que cubre su fecha (SBA-43), y
+/// no vuelve.
 enum EstadoValoracion {
   pendiente
+  con_precio
 
   @@map("estado_valoracion")
   @@schema("inventario")
@@ -340,7 +342,8 @@ model Lote {
 }
 
 /// Lo que la recepción sabe de cada fila y el libro no. Referencia, lote,
-/// cantidad y kilos se leen del movimiento. Solo `valoracion` cambia (SBA-39).
+/// cantidad y kilos se leen del movimiento. Solo `valoracion` cambia, de
+/// pendiente a con_precio (SBA-43).
 model RecepcionDetalle {
   id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   bancoId        String            @map("banco_id") @db.Uuid
@@ -385,10 +388,11 @@ model Movimiento {
   creadoPor    String         @map("creado_por") @db.VarChar(100)
   creadoEn     DateTime       @default(now()) @map("creado_en") @db.Timestamptz
 
-  lote    Lote              @relation(fields: [bancoId, loteId, referenciaId], references: [bancoId, id, referenciaId], onUpdate: Restrict)
-  detalle RecepcionDetalle?
-  baja    Baja?
-  ajuste  Ajuste?
+  lote       Lote              @relation(fields: [bancoId, loteId, referenciaId], references: [bancoId, id, referenciaId], onUpdate: Restrict)
+  detalle    RecepcionDetalle?
+  valoracion Valoracion?
+  baja       Baja?
+  ajuste     Ajuste?
 
   @@id([bancoId, id])
   @@index([bancoId, comandoId])
@@ -459,10 +463,35 @@ model Precio {
   creadoEn           DateTime     @default(now()) @map("creado_en") @db.Timestamptz
   actualizadoEn      DateTime     @default(now()) @updatedAt @map("actualizado_en") @db.Timestamptz
 
-  referencia Referencia @relation(fields: [bancoId, referenciaId], references: [bancoId, id], onUpdate: Restrict)
+  referencia   Referencia   @relation(fields: [bancoId, referenciaId], references: [bancoId, id], onUpdate: Restrict)
+  valoraciones Valoracion[]
 
+  @@unique([bancoId, id])
   @@index([bancoId, referenciaId, vigenteDesde])
   @@map("precio")
+  @@schema("inventario")
+}
+
+/// Lo que vale un movimiento que entró sin precio, escrito cuando se aprueba el
+/// precio que cubre su fecha (SBA-43, ADR-13). Fila aparte para que el
+/// movimiento no cambie; append-only como el libro y una sola por movimiento.
+/// `importe` es cantidad × `valorUnitario`, exacto.
+model Valoracion {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoId       String   @map("banco_id") @db.Uuid
+  movimientoId  String   @map("movimiento_id") @db.Uuid
+  precioId      String   @map("precio_id") @db.Uuid
+  valorUnitario Decimal  @map("valor_unitario") @db.Decimal(14, 2)
+  importe       Decimal  @db.Decimal(24, 5)
+  creadoPor     String   @map("creado_por") @db.VarChar(100)
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz
+
+  movimiento Movimiento @relation(fields: [bancoId, movimientoId], references: [bancoId, id], onUpdate: Restrict)
+  precio     Precio     @relation(fields: [bancoId, precioId], references: [bancoId, id], onUpdate: Restrict)
+
+  @@unique([bancoId, movimientoId])
+  @@index([bancoId, precioId])
+  @@map("valoracion")
   @@schema("inventario")
 }
 

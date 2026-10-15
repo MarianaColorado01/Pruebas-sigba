@@ -14,9 +14,10 @@ export type Novedad = (typeof NOVEDADES)[number];
 
 /**
  * Sin precio vigente aprobado, la fila queda pendiente: nunca en cero (ADR-13).
- * Hasta el maestro de precios (SBA-39) es el único estado.
+ * Pasa a con precio cuando se aprueba uno que cubre el día de la recepción
+ * (SBA-43), y no vuelve.
  */
-export type Valoracion = 'pendiente';
+export type Valoracion = 'pendiente' | 'con_precio';
 
 /**
  * Lo que manda el celular. `comandoId` y cada `movimientoId` los genera el
