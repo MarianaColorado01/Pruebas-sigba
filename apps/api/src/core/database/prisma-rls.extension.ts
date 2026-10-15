@@ -34,17 +34,43 @@ async function fijarContexto(tx: Prisma.TransactionClient, ctx?: TenantContext):
   await tx.$executeRaw`SELECT set_config(${CLAVE_ACTOR}, ${ctx?.actor ?? ''}, true)`;
 }
 
+/**
+ * Tiempos de la transacción interactiva, en milisegundos. Sin ellos rigen los
+ * de Prisma: 2 s de espera por una conexión (`maxWait`) y 5 s de duración
+ * (`timeout`). Al vencer `timeout`, Prisma revierte todo.
+ *
+ * Sube `timeout` solo para una tarea larga y conocida, como la importación de
+ * códigos (SBA-12, SBA-64). Una petición HTTP normal no debería necesitarlo, y
+ * una transacción abierta sostiene bloqueos y una conexión del pool.
+ */
+export interface OpcionesDeTransaccion {
+  maxWait?: number;
+  timeout?: number;
+}
+
+type ClienteTransaccional<R> = {
+  $transaction(
+    fn: (tx: Prisma.TransactionClient) => Promise<R>,
+    opciones?: OpcionesDeTransaccion,
+  ): Promise<R>;
+};
+
+/**
+ * `opciones` va al final y es opcional para que los llamadores que solo pasan
+ * `fn` o `contextOverride` sigan igual.
+ */
 export async function executeTransactionWithTenant<R>(
-  client: { $transaction: (fn: (tx: Prisma.TransactionClient) => Promise<R>) => Promise<R> },
+  client: ClienteTransaccional<R>,
   fn: (tx: Prisma.TransactionClient) => Promise<R>,
   contextOverride?: TenantContext,
+  opciones?: OpcionesDeTransaccion,
 ): Promise<R> {
   const ctx = contextOverride ?? getTenantContext();
 
   return client.$transaction(async (tx: Prisma.TransactionClient) => {
     await fijarContexto(tx, ctx);
     return fn(tx);
-  });
+  }, opciones);
 }
 
 export const rlsExtension = Prisma.defineExtension({
@@ -56,11 +82,12 @@ export const rlsExtension = Prisma.defineExtension({
      * en cero filas en vez de devolver datos de otro banco.
      */
     async $transactionWithTenant<R>(
-      this: { $transaction: (fn: (tx: Prisma.TransactionClient) => Promise<R>) => Promise<R> },
+      this: ClienteTransaccional<R>,
       fn: (tx: Prisma.TransactionClient) => Promise<R>,
       contextOverride?: TenantContext,
+      opciones?: OpcionesDeTransaccion,
     ): Promise<R> {
-      return executeTransactionWithTenant(this, fn, contextOverride);
+      return executeTransactionWithTenant(this, fn, contextOverride, opciones);
     },
   },
 });

@@ -8,6 +8,12 @@ import {
 } from '../services/categoria.js';
 
 /**
+ * La hoja trae hasta 54 `update` en una sola transacción; contra Neon el
+ * tiempo de Prisma (5 s) no alcanza (SBA-64).
+ */
+const TIMEOUT_DE_IMPORTACION_MS = 30_000;
+
+/**
  * Adaptador de Prisma para las categorías del Banco. Todo pasa por
  * `executeTransactionWithTenant`: fuera de ella RLS deja cada consulta en cero
  * filas. Las consultas filtran además por `banco_id`: el comando corre con
@@ -26,56 +32,61 @@ export class CategoriasPrismaRepositorio extends CategoriasRepositorio {
     const { bancoId, actor } = contexto();
 
     // Una sola transacción: si una fila falla, no queda media hoja importada.
-    return executeTransactionWithTenant<ResultadoDeGuardado>(this.prisma, async (tx) => {
-      const existentes = await tx.categoria.findMany({
-        where: { bancoId, codigo: { in: categorias.map((c) => c.codigo) } },
-        select: { id: true, codigo: true, nombre: true, linea: true, descripcion: true },
-      });
-      const porCodigo = new Map(existentes.map((e) => [e.codigo, e]));
-      const resultado = { creadas: 0, actualizadas: 0, sinCambios: 0 };
-      const nuevas = [];
-
-      for (const categoria of categorias) {
-        const actual = porCodigo.get(categoria.codigo);
-        if (!actual) {
-          nuevas.push({ ...categoria, bancoId, creadoPor: actor, actualizadoPor: actor });
-          resultado.creadas++;
-        } else if (
-          actual.nombre === categoria.nombre &&
-          (categoria.linea === undefined || actual.linea === categoria.linea) &&
-          (categoria.descripcion === undefined || actual.descripcion === categoria.descripcion)
-        ) {
-          resultado.sinCambios++;
-        } else {
-          // Prisma omite los campos undefined: una columna que el archivo no
-          // trae no borra el valor guardado.
-          const actualizada = await tx.categoria.update({
-            where: { bancoId_codigo: { bancoId, codigo: categoria.codigo } },
-            data: { ...categoria, actualizadoPor: actor },
-            select: { id: true },
-          });
-          await this.auditoria.registrar(tx, {
-            accion: 'actualizar',
-            entidad: 'categoria',
-            entidadId: actualizada.id,
-          });
-          resultado.actualizadas++;
-        }
-      }
-
-      const creadas = await tx.categoria.createManyAndReturn({
-        data: nuevas,
-        select: { id: true },
-      });
-      for (const categoria of creadas) {
-        await this.auditoria.registrar(tx, {
-          accion: 'crear',
-          entidad: 'categoria',
-          entidadId: categoria.id,
+    return executeTransactionWithTenant<ResultadoDeGuardado>(
+      this.prisma,
+      async (tx) => {
+        const existentes = await tx.categoria.findMany({
+          where: { bancoId, codigo: { in: categorias.map((c) => c.codigo) } },
+          select: { id: true, codigo: true, nombre: true, linea: true, descripcion: true },
         });
-      }
-      return resultado;
-    });
+        const porCodigo = new Map(existentes.map((e) => [e.codigo, e]));
+        const resultado = { creadas: 0, actualizadas: 0, sinCambios: 0 };
+        const nuevas = [];
+
+        for (const categoria of categorias) {
+          const actual = porCodigo.get(categoria.codigo);
+          if (!actual) {
+            nuevas.push({ ...categoria, bancoId, creadoPor: actor, actualizadoPor: actor });
+            resultado.creadas++;
+          } else if (
+            actual.nombre === categoria.nombre &&
+            (categoria.linea === undefined || actual.linea === categoria.linea) &&
+            (categoria.descripcion === undefined || actual.descripcion === categoria.descripcion)
+          ) {
+            resultado.sinCambios++;
+          } else {
+            // Prisma omite los campos undefined: una columna que el archivo no
+            // trae no borra el valor guardado.
+            const actualizada = await tx.categoria.update({
+              where: { bancoId_codigo: { bancoId, codigo: categoria.codigo } },
+              data: { ...categoria, actualizadoPor: actor },
+              select: { id: true },
+            });
+            await this.auditoria.registrar(tx, {
+              accion: 'actualizar',
+              entidad: 'categoria',
+              entidadId: actualizada.id,
+            });
+            resultado.actualizadas++;
+          }
+        }
+
+        const creadas = await tx.categoria.createManyAndReturn({
+          data: nuevas,
+          select: { id: true },
+        });
+        for (const categoria of creadas) {
+          await this.auditoria.registrar(tx, {
+            accion: 'crear',
+            entidad: 'categoria',
+            entidadId: categoria.id,
+          });
+        }
+        return resultado;
+      },
+      undefined,
+      { timeout: TIMEOUT_DE_IMPORTACION_MS },
+    );
   }
 
   async productosSinCodigo(): Promise<string[]> {
