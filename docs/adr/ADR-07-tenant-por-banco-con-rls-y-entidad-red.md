@@ -29,3 +29,23 @@ RLS no protege ante un superusuario, una función privilegiada insegura o un
 contexto incorrecto: CI debe probar esos límites.
 
 La entidad red no habilita consultas nominales entre bancos.
+
+## Nota del 15 de octubre de 2026: tablas globales (SBA-61)
+
+Los permisos propios de las entidades globales quedan así:
+
+- `red`, `rol` y `banco` no tienen RLS. Son catálogos sin `banco_id` ni datos
+  personales: la red ABACO, los roles de Arquitectura 8.2 y el nombre y código
+  de cada banco. La API los lee con `GRANT SELECT` y solo escribe en ellos con
+  una línea explícita en `rol-de-api.sql`.
+- `usuario` tiene RLS forzada. La API ve la fila propia (`app.usuario_id`) y
+  la de quien tenga una asignación activa en `app.banco_id`. Una persona que
+  solo está en el banco B no aparece para el banco A.
+- Las cuatro están en el registro `core.tabla_global`, con su control
+  (`catalogo` o `rls`) y su razón. `core.verificar_politicas_rls()` lo lee:
+  una tabla de negocio sin `banco_id` que no esté registrada hace fallar la
+  migración, igual que una registrada como `rls` sin RLS forzada y política, o
+  una que dé privilegios a `PUBLIC`.
+- Una tabla global nueva entra al registro con un `INSERT` en la migración que
+  la crea, y cambiar su control es un `UPDATE`; la función no se toca.
+  `sba-19-bancos-y-bodegas` pasa `banco` a `rls` cuando le pone RLS (D7).
