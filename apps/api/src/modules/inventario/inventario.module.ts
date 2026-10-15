@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ReferenciasController } from './controllers/referencias.controller.js';
 import { CategoriasPrismaRepositorio } from './repositories/categorias.prisma.repositorio.js';
 import { DonantesPrismaRepositorio } from './repositories/donantes.prisma.repositorio.js';
 import { ReferenciasPrismaRepositorio } from './repositories/referencias.prisma.repositorio.js';
@@ -18,7 +19,7 @@ import { ReferenciasService } from './services/referencias.service.js';
  */
 @Module({
   imports: [],
-  controllers: [],
+  controllers: [ReferenciasController],
   providers: [
     DonantesService,
     { provide: DonantesRepositorio, useClass: DonantesPrismaRepositorio },

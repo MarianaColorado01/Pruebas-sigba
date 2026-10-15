@@ -1,6 +1,7 @@
 import { BubbleChatIcon, WifiDisconnected01Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Button } from '@/ui/button';
+import { Link } from 'react-router';
+import { Button, buttonVariants } from '@/ui/button';
 import { useEstadoDeConexion } from '../offline/useEstadoDeConexion.ts';
 
 export function Inicio() {
@@ -35,6 +36,13 @@ export function Inicio() {
         <HugeiconsIcon icon={BubbleChatIcon} aria-hidden />
         Registrar recepción
       </Button>
+
+      <Link
+        to="/catalogo"
+        className={buttonVariants({ variant: 'outline', className: 'self-start' })}
+      >
+        Buscar en el catálogo
+      </Link>
     </main>
   );
 }

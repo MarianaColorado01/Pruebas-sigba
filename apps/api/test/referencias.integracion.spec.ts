@@ -466,6 +466,29 @@ describe.skipIf(!URL_ADMIN)('Catálogo contra PostgreSQL (SBA-22)', () => {
     ).rejects.toThrow(ConflictException);
   });
 
+  it('la unicidad de producto y presentación ignora mayúsculas y tildes', async () => {
+    const { cereales, arroz } = await catalogoDePrueba();
+
+    await expect(
+      enBanco(bancoA, () => servicio.crearProducto({ categoriaId: cereales.id, nombre: 'arróz' })),
+    ).rejects.toThrow(ConflictException);
+    await expect(
+      enBanco(bancoA, () =>
+        servicio.crearReferencia({ productoId: arroz.id, presentacion: '1 KG', equivalenciaKg: 1 }),
+      ),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('la búsqueda encuentra «Arróz» cuando se escribe «arroz»', async () => {
+    const { arroz } = await catalogoDePrueba();
+    await enBanco(bancoA, () => servicio.editarProducto(arroz.id, { nombre: 'Arróz' }));
+
+    const encontradas = await enBanco(bancoA, () => servicio.buscar({ texto: 'arroz' }));
+
+    expect(encontradas).toHaveLength(3);
+    expect(encontradas.every((r) => r.producto.nombre === 'Arróz')).toBe(true);
+  });
+
   it('asigna código a un producto moviéndolo de categoría', async () => {
     const { arroz } = await catalogoDePrueba();
 
@@ -592,6 +615,25 @@ describe.skipIf(!URL_ADMIN)('Catálogo contra PostgreSQL (SBA-22)', () => {
       expect(
         encontradas.map((r) => `${r.categoria.codigo} ${r.producto.nombre} ${r.presentacion}`),
       ).toEqual(['C801 Arroz 1 kg']);
+    });
+
+    it('la unicidad sin mayúsculas ni tildes es por banco: el banco B crea «arróz» y «1 KG»', async () => {
+      await catalogoDePrueba();
+
+      const creada = await enBanco(bancoB, async () => {
+        const categoria = await servicio.crearCategoria({ codigo: 'C801', nombre: 'Arroz' });
+        const producto = await servicio.crearProducto({
+          categoriaId: categoria.id,
+          nombre: 'arróz',
+        });
+        return servicio.crearReferencia({
+          productoId: producto.id,
+          presentacion: '1 KG',
+          equivalenciaKg: 1,
+        });
+      });
+
+      expect(`${creada.producto.nombre} ${creada.presentacion}`).toBe('arróz 1 KG');
     });
   });
 });

@@ -187,7 +187,8 @@ model Producto {
   referencias Referencia[]
 
   @@unique([bancoId, id])
-  @@unique([bancoId, nombre])
+  // El UNIQUE (banco_id, inventario.normalizar(nombre)) vive en la migración
+  // 20261013120000: Prisma no expresa índices sobre expresiones (SBA-22).
   @@map("producto")
   @@schema("inventario")
 }
@@ -210,7 +211,8 @@ model Referencia {
 
   producto Producto @relation(fields: [bancoId, productoId], references: [bancoId, id])
 
-  @@unique([bancoId, productoId, presentacion])
+  // El UNIQUE (banco_id, producto_id, inventario.normalizar(presentacion)) vive
+  // en la migración 20261013120000: Prisma no expresa índices sobre expresiones.
   @@map("referencia")
   @@schema("inventario")
 }

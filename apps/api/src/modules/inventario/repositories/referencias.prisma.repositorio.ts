@@ -101,38 +101,47 @@ export class ReferenciasPrismaRepositorio extends ReferenciasRepositorio {
     limite,
   }: BusquedaDeReferencias): Promise<ReferenciaDelCatalogo[]> {
     const { bancoId } = contexto();
-    const insensible = { mode: 'insensitive' as const };
 
-    const filas = await executeTransactionWithTenant<FilaDeReferencia[]>(this.prisma, (tx) =>
-      tx.referencia.findMany({
-        where: {
-          bancoId,
-          ...(soloActivas && { activa: true }),
-          producto: {
-            ...(categoriaId && { categoriaId }),
-            ...(soloActivas && { activo: true, categoria: { activa: true } }),
-          },
-          AND: palabras.map((palabra) => ({
-            OR: [
-              { presentacion: { contains: palabra, ...insensible } },
-              { producto: { nombre: { contains: palabra, ...insensible } } },
-              { producto: { categoria: { codigo: { equals: palabra, ...insensible } } } },
-            ],
-          })),
-        },
-        // Termina en id: con el corte de `limite`, un empate dejaría que la
-        // lista cambie entre dos pulsaciones.
-        orderBy: [
-          { producto: { nombre: 'asc' } },
-          { equivalenciaKg: 'asc' },
-          { presentacion: 'asc' },
-          { id: 'asc' },
-        ],
-        take: limite,
+    return executeTransactionWithTenant<ReferenciaDelCatalogo[]>(this.prisma, async (tx) => {
+      // Prisma no compara con una función de la base, así que el filtro va en
+      // SQL con la misma normalización de los índices únicos: «arroz» encuentra
+      // «Arróz».
+      const filtros = [Prisma.sql`r."banco_id" = ${bancoId}::uuid`];
+      if (soloActivas) filtros.push(Prisma.sql`r."activa" AND p."activo" AND c."activa"`);
+      if (categoriaId) filtros.push(Prisma.sql`p."categoria_id" = ${categoriaId}::uuid`);
+      for (const palabra of palabras) {
+        filtros.push(Prisma.sql`(
+          strpos(inventario.normalizar(r."presentacion"), inventario.normalizar(${palabra})) > 0
+          OR strpos(inventario.normalizar(p."nombre"), inventario.normalizar(${palabra})) > 0
+          OR inventario.normalizar(c."codigo") = inventario.normalizar(${palabra})
+        )`);
+      }
+
+      // Termina en id: con el corte de `limite`, un empate dejaría que la lista
+      // cambie entre dos pulsaciones.
+      const idsOrdenados = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+        SELECT r."id"
+        FROM "inventario"."referencia" r
+        JOIN "inventario"."producto" p
+          ON p."banco_id" = r."banco_id" AND p."id" = r."producto_id"
+        JOIN "inventario"."categoria" c
+          ON c."banco_id" = p."banco_id" AND c."id" = p."categoria_id"
+        WHERE ${Prisma.join(filtros, ' AND ')}
+        ORDER BY p."nombre", r."equivalencia_kg", r."presentacion", r."id"
+        LIMIT ${limite}
+      `);
+      if (idsOrdenados.length === 0) return [];
+
+      const filas = await tx.referencia.findMany({
+        where: { bancoId, id: { in: idsOrdenados.map(({ id }) => id) } },
         select: COLUMNAS_DE_REFERENCIA,
-      }),
-    );
-    return filas.map(aReferencia);
+      });
+      const porId = new Map(filas.map((fila) => [fila.id, fila]));
+      return idsOrdenados.flatMap(({ id }) => {
+        const fila = porId.get(id);
+        return fila ? [aReferencia(fila)] : [];
+      });
+    });
   }
 
   async catalogo(): Promise<CategoriaDelCatalogo[]> {

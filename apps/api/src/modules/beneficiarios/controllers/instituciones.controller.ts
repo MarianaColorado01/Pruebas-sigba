@@ -1,15 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  ParseUUIDPipe,
-  Patch,
-  Post,
-  Query,
-  UsePipes,
-  ValidationPipe,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { Roles } from '../../../core/index.js';
 import {
   CrearInstitucionDto,
@@ -26,8 +15,6 @@ import type { Institucion } from '../services/institucion.js';
  */
 @Controller('instituciones')
 @Roles('admin_banco', 'coordinacion')
-// ponytail: pipe local porque aún no hay uno global; sube a main.ts cuando otro controlador lo necesite.
-@UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
 export class InstitucionesController {
   constructor(private readonly directorio: DirectorioDeInstitucionesService) {}
 

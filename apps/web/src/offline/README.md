@@ -3,10 +3,13 @@
 Aquí vive la cola local de comandos, la caché versionada del catálogo y la
 reconciliación al sincronizar (Arquitectura 5.3 y 8.4, ADR-10).
 
-**Todavía no hay esquema de Dexie, y es a propósito.** La secuencia aceptada en
-ADR-10 es: base idempotente en la Iteración 1, libro completo en la 2, cola de
-recepción en la 3 y cola de salidas en la 4. Dexie está instalado para que el
-esquema entre sin tocar dependencias.
+`catalogoDb.ts` guarda una copia del catálogo por banco con su ETag (SBA-22). La
+pantalla la valida al abrir y avisa «posiblemente desactualizado» mientras
+muestra la copia sin confirmar con la API. El catálogo no trae datos personales.
+
+La cola de comandos todavía no existe. La secuencia aceptada en ADR-10 es: base
+idempotente en la Iteración 1, libro completo en la 2, cola de recepción en la 3
+y cola de salidas en la 4.
 
 Cuando llegue, la cola guarda cada comando con `comando_id` UUIDv7, banco,
 usuario, versión y estado (`pendiente`, `confirmado`, `conflicto`), y respeta el

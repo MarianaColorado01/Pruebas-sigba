@@ -2,7 +2,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { createContext, useCallback, useContext } from 'react';
 import { CABECERAS, type Rol } from '@sigba/shared-types';
 import { useEstadoReautenticacion } from './reautenticacion.ts';
-import { ErrorDeApi, pedir } from './clienteHttp.ts';
+import { ErrorDeApi, pedir, pedirConEtag } from './clienteHttp.ts';
 
 /**
  * Con qué rol, banco e institución actúa la persona en esta sesión
@@ -39,21 +39,24 @@ function cabecerasDe(asignacion: AsignacionActiva | null, propias?: HeadersInit)
   return cabeceras;
 }
 
+/** Las dos formas de llamar a la API; las dos reciben el token al final. */
+type Llamada<R> = (ruta: string, opciones: RequestInit, accessToken?: string) => Promise<R>;
+
 /**
- * `pedir` con el banco y la institución de la sesión en las cabeceras, que es
- * con lo que la API elige la asignación. Las features usan este y no `pedir`.
+ * Token, cabeceras de la sesión y aviso de reautenticación alrededor de una
+ * llamada a la API. Lo comparten `usePedir` y `usePedirConEtag`.
  */
-export function usePedir() {
+function useLlamadaConSesion() {
   const asignacion = useAsignacion();
   const { getAccessTokenSilently } = useAuth0();
   const { marcarRequerido } = useEstadoReautenticacion();
 
   return useCallback(
-    async <T>(ruta: string, opciones: RequestInit = {}) => {
+    async <R>(llamada: Llamada<R>, ruta: string, opciones: RequestInit): Promise<R> => {
       try {
         const accessToken = await getAccessTokenSilently();
         marcarRequerido(false);
-        return await pedir<T>(
+        return await llamada(
           ruta,
           { ...opciones, headers: cabecerasDe(asignacion, opciones.headers) },
           accessToken,
@@ -75,5 +78,26 @@ export function usePedir() {
       }
     },
     [asignacion, getAccessTokenSilently, marcarRequerido],
+  );
+}
+
+/**
+ * `pedir` con el banco y la institución de la sesión en las cabeceras, que es
+ * con lo que la API elige la asignación. Las features usan este y no `pedir`.
+ */
+export function usePedir() {
+  const llamar = useLlamadaConSesion();
+  return useCallback(
+    <T>(ruta: string, opciones: RequestInit = {}) => llamar(pedir<T>, ruta, opciones),
+    [llamar],
+  );
+}
+
+/** Igual que `usePedir`, para las rutas con ETag: devuelve el estado y el ETag. */
+export function usePedirConEtag() {
+  const llamar = useLlamadaConSesion();
+  return useCallback(
+    <T>(ruta: string, opciones: RequestInit = {}) => llamar(pedirConEtag<T>, ruta, opciones),
+    [llamar],
   );
 }

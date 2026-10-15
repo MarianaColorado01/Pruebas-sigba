@@ -4,7 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from './../src/app.module.js';
-import { corsOrigins } from '../src/cors.js';
+import { configurarApp } from '../src/configurar-app.js';
 
 /**
  * Levanta la aplicación completa. Lo que comprueba antes que nada es que
@@ -20,8 +20,7 @@ describe('API (e2e)', () => {
     }).compile();
 
     app = modulo.createNestApplication();
-    app.enableCors({ origin: corsOrigins('http://localhost:5173') });
-    app.setGlobalPrefix('api/v1');
+    configurarApp(app, ['http://localhost:5173']);
     await app.init();
   });
 
