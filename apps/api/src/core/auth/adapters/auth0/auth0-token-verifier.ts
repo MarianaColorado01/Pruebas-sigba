@@ -25,6 +25,19 @@ export class Auth0TokenVerifier implements TokenVerifier {
     }
 
     // Con la opción `issuer`, jose ya rechazó cualquier `iss` distinto.
-    return { auth0Sub: payload.sub, emisor: this.config.issuer };
+    const identidad: IdentidadDeAutenticacion = {
+      auth0Sub: payload.sub,
+      emisor: this.config.issuer,
+    };
+
+    // Auth0 no pone el correo en el access token por sí solo. Una Action lo
+    // agrega bajo la audiencia como espacio de nombres, y solo esas claves se
+    // leen. Sin la Action no hay correo, y aceptar una invitación da 403.
+    const espacio = this.config.audience.replace(/\/+$/, '');
+    const email = payload[`${espacio}/email`];
+    if (typeof email === 'string' && email.trim()) identidad.email = email;
+    if (payload[`${espacio}/email_verified`] === true) identidad.emailVerificado = true;
+
+    return identidad;
   }
 }

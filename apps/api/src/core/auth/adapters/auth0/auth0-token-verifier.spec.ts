@@ -73,6 +73,62 @@ describe('Auth0TokenVerifier', () => {
     });
   });
 
+  it('lee el correo y su verificación de los claims bajo la audiencia', async () => {
+    await expect(
+      verifier().verify(
+        token(
+          claims({
+            [`${audience}/email`]: 'Ana@Example.com',
+            [`${audience}/email_verified`]: true,
+          }),
+        ),
+      ),
+    ).resolves.toEqual({
+      auth0Sub: 'auth0|synthetic-user',
+      emisor: issuer,
+      email: 'Ana@Example.com',
+      emailVerificado: true,
+    });
+  });
+
+  it('ignora el correo sin espacio de nombres y toma como no verificado lo que no es true', async () => {
+    const identidad = await verifier().verify(
+      token(
+        claims({
+          email: 'otra@example.com',
+          email_verified: true,
+          [`${audience}/email`]: 'ana@example.com',
+          [`${audience}/email_verified`]: 'true',
+        }),
+      ),
+    );
+
+    expect(identidad).toEqual({
+      auth0Sub: 'auth0|synthetic-user',
+      emisor: issuer,
+      email: 'ana@example.com',
+    });
+  });
+
+  it('tolera una audiencia con barra final', async () => {
+    const conBarra = 'https://api.sigba.synthetic/';
+    const identidad = await new Auth0TokenVerifier({
+      issuer,
+      audience: conBarra,
+      jwksUri,
+    }).verify(
+      token(
+        claims({
+          aud: conBarra,
+          'https://api.sigba.synthetic/email': 'ana@example.com',
+          'https://api.sigba.synthetic/email_verified': true,
+        }),
+      ),
+    );
+
+    expect(identidad).toMatchObject({ email: 'ana@example.com', emailVerificado: true });
+  });
+
   it.each([
     ['expirado', claims({ exp: Math.floor(Date.now() / 1000) - 1 })],
     ['sin exp', claims({ exp: undefined })],

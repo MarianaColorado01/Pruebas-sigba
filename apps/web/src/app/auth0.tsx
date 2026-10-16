@@ -2,6 +2,14 @@ import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
 import { useState, type ReactNode } from 'react';
 import { Button } from '@/ui/button';
 import { ReautenticacionContext, useEstadoReautenticacion } from '@/shared/reautenticacion.ts';
+import { enrutador } from './enrutador.tsx';
+
+/**
+ * La página de invitación pide la sesión ella misma: ofrece crear cuenta o
+ * entrar (D2). Con la pantalla de inicio de sesión de siempre, quien no tiene
+ * cuenta no sabría que debe registrarse.
+ */
+const esInvitacion = () => window.location.pathname.startsWith('/invitacion');
 
 export function ProviderAuth0({ children }: { children: ReactNode }) {
   const [requerido, marcarRequerido] = useState(false);
@@ -24,6 +32,11 @@ export function ProviderAuth0({ children }: { children: ReactNode }) {
       clientId={VITE_AUTH0_CLIENT_ID}
       cacheLocation="memory"
       useRefreshTokens
+      // El enrutador ya arrancó en la URL de vuelta de Auth0: hay que llevarlo a
+      // donde iba la persona, que es la página de invitación o la raíz.
+      onRedirectCallback={(appState) =>
+        void enrutador.navigate(appState?.returnTo ?? '/', { replace: true })
+      }
       authorizationParams={{
         audience: VITE_AUTH0_AUDIENCE,
         redirect_uri: window.location.origin,
@@ -47,6 +60,8 @@ export function AccesoAuth0({ children }: { children: ReactNode }) {
         Cargando sesión
       </main>
     );
+
+  if (!isAuthenticated && esInvitacion()) return children;
 
   if (error || !isAuthenticated) {
     return (

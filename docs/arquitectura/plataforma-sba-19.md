@@ -42,12 +42,21 @@ Quien se registre sin invitación no tiene asignación y recibe 403, como hoy.
 **Lo cambiaría:** que el Banco quiera cerrar el registro público. Entonces sí
 hace falta la Management API para crear la cuenta desde SIGBA.
 
-## D3. No se exige que el correo del token coincida
+## D3. Quien acepta prueba que el correo es suyo
 
-El access token no trae el correo. La credencial es el token de la invitación:
-un solo uso, vencimiento corto y aceptación auditada con el `sub`. Si el enlace
-llega a otra persona, el administrador lo ve en la lista (quién aceptó y
-cuándo) y desactiva la asignación.
+Un enlace reenviado o filtrado no basta. Aceptar exige que el access token
+traiga un correo verificado y que sea el de la invitación, sin distinguir
+mayúsculas ni espacios en los extremos. Si no, 403 con `correo_no_verificado`
+o `correo_no_coincide`, y el mensaje no dice a qué correo se invitó.
+
+Auth0 no pone el correo en el access token por sí solo. Una Action lo agrega
+con la audiencia de la API como espacio de nombres (`<audiencia>/email` y
+`<audiencia>/email_verified`); la API lee solo esas claves. Sin la Action,
+nadie puede aceptar una invitación. Está en [auth0-setup.md](auth0-setup.md).
+
+El servicio rechaza el token sin correo verificado antes de tocar la base. La
+comparación la hace `plataforma.aceptar_invitacion`, porque solo ella ve el
+correo de la invitación. La aceptación sigue auditada con el `sub`.
 
 Si el usuario es nuevo, `usuario.email` y `usuario.nombre` toman los datos de
 la invitación.
@@ -60,7 +69,13 @@ la invitación.
 - Reenviar genera un token nuevo en la misma fila, reemplaza el hash y renueva
   el vencimiento. El enlace anterior deja de servir.
 - Enlace: `${WEB_URL}/invitacion/${token}`. `WEB_URL` es variable nueva de la
-  API.
+  API: el origen http(s) de la PWA, sin ruta. La API la valida al arrancar y no
+  sube si falta o está mal formada.
+- Una invitación pendiente por banco y correo (sin distinguir mayúsculas), con
+  un índice único parcial. Invitar otra vez con el mismo rol e institución
+  devuelve la misma invitación con 200, sin fila nueva y sin correo. Como solo se
+  guarda el hash, esa respuesta no trae enlace (`enlace: null`, `yaExistia:
+true`); para obtener uno, reenviar. Con otro rol o institución, 409.
 - El token nunca va a logs, auditoría, Sentry, outbox ni mensajes de error.
 
 ## D5. Tabla `plataforma.invitacion` y aceptación
@@ -73,21 +88,27 @@ RLS por `banco_id` con USING y WITH CHECK, como `bodega`.
 
 Quien acepta todavía no tiene banco en contexto, así que la aceptación va por
 una función `SECURITY DEFINER`:
-`plataforma.aceptar_invitacion(token_hash text, emisor text, auth0_sub text)`.
+`plataforma.aceptar_invitacion(token_hash text, emisor text, auth0_sub text, email text)`.
 En una transacción:
 
 1. Busca la invitación por hash con `FOR UPDATE`.
-2. Valida que exista, no esté vencida, usada ni revocada.
-3. Crea el usuario por `(emisor, auth0_sub)` o reutiliza el existente.
-4. Inserta la asignación en `usuario_rol`. Si ya existe activa, no duplica.
-5. Marca la invitación como aceptada.
-6. Fija `app.banco_id` y registra auditoría.
+2. Valida que exista y que `email` (el correo verificado del token) sea el
+   invitado.
+3. Valida que no esté vencida, usada ni revocada, y que ni el usuario ni el
+   banco estén inactivos.
+4. Crea el usuario por `(emisor, auth0_sub)` o reutiliza el existente.
+5. Inserta la asignación en `usuario_rol`. Si ya existe activa, no duplica.
+6. Marca la invitación como aceptada.
+7. Fija `app.banco_id` y registra auditoría.
 
 Devuelve `banco_id` y rol. Lleva `REVOKE ... FROM PUBLIC` en la migración y su
 `GRANT EXECUTE` en `prisma/roles/rol-de-api.sql`, en el mismo PR.
 
 Invitación inexistente, vencida, usada o revocada: 410 con un código
 (`vencida`, `usada`, `revocada`, `no_existe`) para que la PWA diga qué pasó.
+Correo no verificado o distinto, usuario inactivo o banco inactivo: 403 con
+`correo_no_verificado`, `correo_no_coincide`, `usuario_inactivo` o
+`banco_inactivo`. Un correo que ya es de otra cuenta: 409 `correo_en_uso`.
 
 ## D6. Rutas que exigen sesión pero no asignación
 

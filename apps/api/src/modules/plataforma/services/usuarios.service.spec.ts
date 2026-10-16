@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { EnviadorNulo } from '../../../core/correo/enviador-de-correo.js';
 import { runWithTenantContext } from '../../../core/index.js';
-import type { FilaDeAsignacion } from './usuario.js';
+import type { InvitacionesRepositorio } from './invitacion.js';
+import type { FilaDeAsignacion, UsuariosRepositorio } from './usuario.js';
 import { UsuariosService } from './usuarios.service.js';
 
 const usuarioId = '11111111-1111-4111-8111-111111111111';
@@ -15,7 +17,12 @@ function servicioCon({ id, filas = [] }: { id?: string; filas?: FilaDeAsignacion
   const idPorIdentidad = vi.fn().mockResolvedValue(id);
   const asignacionesActivas = vi.fn().mockResolvedValue(filas);
   return {
-    servicio: new UsuariosService({ idPorIdentidad, asignacionesActivas }),
+    servicio: new UsuariosService(
+      { idPorIdentidad, asignacionesActivas } as unknown as UsuariosRepositorio,
+      {} as InvitacionesRepositorio,
+      new EnviadorNulo(),
+      'https://sigba.example',
+    ),
     idPorIdentidad,
     asignacionesActivas,
   };

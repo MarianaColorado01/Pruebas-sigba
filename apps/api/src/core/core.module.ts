@@ -16,6 +16,8 @@ import { TOKEN_VERIFIER } from './auth/token-verifier.js';
  * autorización y el resolutor de identidad se componen desde AppModule.
  */
 import { AuditService } from './auditoria/audit.service.js';
+import { crearEnviadorDeCorreo } from './correo/crear-enviador-de-correo.js';
+import { EnviadorDeCorreo } from './correo/enviador-de-correo.js';
 import { PrismaService } from './database/prisma.service.js';
 import { IdempotenciaService } from './idempotencia/idempotencia.service.js';
 import { OutboxService } from './outbox/outbox.service.js';
@@ -27,11 +29,19 @@ import { OutboxService } from './outbox/outbox.service.js';
     AuditService,
     IdempotenciaService,
     OutboxService,
+    { provide: EnviadorDeCorreo, useFactory: () => crearEnviadorDeCorreo() },
     {
       provide: TOKEN_VERIFIER,
       useFactory: () => new Auth0TokenVerifier(cargarConfiguracionAuth0()),
     },
   ],
-  exports: [PrismaService, AuditService, IdempotenciaService, OutboxService, TOKEN_VERIFIER],
+  exports: [
+    PrismaService,
+    AuditService,
+    IdempotenciaService,
+    OutboxService,
+    EnviadorDeCorreo,
+    TOKEN_VERIFIER,
+  ],
 })
 export class CoreModule {}

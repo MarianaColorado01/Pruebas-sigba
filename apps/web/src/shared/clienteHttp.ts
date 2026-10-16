@@ -10,12 +10,31 @@ const BASE = import.meta.env['VITE_API_URL'] ?? '/api/v1';
 
 export class ErrorDeApi extends Error {
   readonly estado: number;
+  /** Motivo que la API manda en `codigo`, como el de una invitación que no sirve. */
+  readonly codigo: string | undefined;
 
-  constructor(estado: number, mensaje: string) {
+  constructor(estado: number, mensaje: string, codigo?: string) {
     super(mensaje);
     this.name = 'ErrorDeApi';
     this.estado = estado;
+    this.codigo = codigo;
   }
+}
+
+/** El `message` y el `codigo` del cuerpo de error de Nest, si vienen como texto. */
+async function errorDe(respuesta: Response): Promise<ErrorDeApi> {
+  const cuerpo: unknown = await respuesta.json().catch(() => null);
+  const campo = (nombre: string) =>
+    typeof cuerpo === 'object' && cuerpo !== null && nombre in cuerpo
+      ? (cuerpo as Record<string, unknown>)[nombre]
+      : undefined;
+  const mensaje = campo('message');
+  const codigo = campo('codigo');
+  return new ErrorDeApi(
+    respuesta.status,
+    typeof mensaje === 'string' ? mensaje : `La API respondió ${respuesta.status}`,
+    typeof codigo === 'string' ? codigo : undefined,
+  );
 }
 
 /** Lo que responde una ruta con ETag: 304 llega sin datos. */
@@ -35,9 +54,7 @@ async function llamar(
 
   const respuesta = await fetch(`${BASE}${ruta}`, { ...opciones, headers });
 
-  if (!respuesta.ok && respuesta.status !== 304) {
-    throw new ErrorDeApi(respuesta.status, `La API respondió ${respuesta.status}`);
-  }
+  if (!respuesta.ok && respuesta.status !== 304) throw await errorDe(respuesta);
   return respuesta;
 }
 

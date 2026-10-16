@@ -22,7 +22,8 @@ importa un módulo. El lint lo comprueba y falla si se invierte (ADR-01).
 - `OutboxService.emitir()` escribe eventos dentro de la transacción del caso de uso: SBA-30.
   Los contratos permanecen en borrador hasta la aprobación de arquitectura y de los equipos
   consumidores.
-- Puertos de almacenamiento, correo, visión y precios: SBA-13 y SBA-54.
+- Puerto `EnviadorDeCorreo` con adaptador SMTP y nulo: SBA-19 (D1).
+- Puertos de almacenamiento, visión y precios: SBA-13 y SBA-54.
 
 ## Quién entra a cada ruta
 

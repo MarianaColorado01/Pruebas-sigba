@@ -17,6 +17,7 @@ La universidad debe crear o asignar el tenant institucional. La cuenta propietar
 9. Fijar las vigencias. El access token se define en la API (**Maximum Access Token Lifetime**). El refresh token se define en la aplicación (**Absolute Lifetime** e **Inactivity Lifetime**, con **Refresh Token Expiration** activado). Un access token corto limita lo que vale uno robado; el refresh token decide cada cuánto el operario vuelve a iniciar sesión para sincronizar. Valores del piloto [por verificar].
 10. MFA puede habilitarse como política del tenant si la universidad lo aprueba. El piloto no exige MFA.
 11. Crear usuarios de prueba sintéticos y asignar roles operativos desde SIGBA, no desde claims de Auth0.
+12. En **Authentication > Database > Username-Password-Authentication**, dejar desactivado **Disable Sign Ups**. Las invitaciones de SIGBA (SBA-19, D2) abren el registro de Auth0 con `screen_hint: 'signup'`; sin registro, una persona nueva no puede crear su cuenta. Quien se registre sin invitación no tiene asignación y la API le responde 403.
 
 La API acepta solicitudes de navegador desde los orígenes exactos de `CORS_ORIGINS`, separados por coma. En local usa `http://localhost:5173`; en staging agrega el hostname exacto de Cloudflare Pages. No configures comodines.
 
@@ -32,6 +33,20 @@ VITE_AUTH0_AUDIENCE=https://api.sigba.example
 
 La API deriva el JWKS del issuer (`<issuer>.well-known/jwks.json`) y rechaza al arrancar un issuer que no sea HTTPS. El client ID de la SPA es público; no añadir client secrets a la PWA.
 
+## Correo en el access token (invitaciones)
+
+Aceptar una invitación exige que el access token traiga el correo y que esté verificado (SBA-19, D3). Auth0 no los incluye en el access token por defecto, y los claims propios deben llevar un espacio de nombres. La API lee `<AUTH0_AUDIENCE>/email` y `<AUTH0_AUDIENCE>/email_verified`, con la audiencia sin barra final, y ignora cualquier otra clave. Una Action de Login / Post Login los agrega:
+
+```js
+exports.onExecutePostLogin = async (event, api) => {
+  const espacio = 'https://api.sigba.example'; // la misma audiencia de la API
+  api.accessToken.setCustomClaim(`${espacio}/email`, event.user.email);
+  api.accessToken.setCustomClaim(`${espacio}/email_verified`, event.user.email_verified);
+};
+```
+
+Esta Action es lo que la API espera; no se ha desplegado ni probado en el tenant institucional [por verificar]. Sin ella, aceptar una invitación responde 403 `correo_no_verificado`. Cuándo queda `email_verified` en verdadero para una cuenta nueva con contraseña, y si Auth0 deja entrar antes de verificar, depende de la configuración del tenant [por verificar].
+
 ## Identidad y RLS
 
 La API valida firma, `iss`, `aud`, expiración y `RS256` con JWKS remoto. La audiencia de API impide usar un ID token dirigido al client ID como credencial de la API. El guard no consulta PostgreSQL: ante un token inválido responde 401 antes de resolver la identidad.
@@ -40,7 +55,7 @@ La API valida firma, `iss`, `aud`, expiración y `RS256` con JWKS remoto. La aud
 
 `DATABASE_URL` identifica la conexión administrativa para migraciones y seed. La API usa `API_DATABASE_URL` con el rol `sigba_app`, que no es superusuario y no elude RLS. Sus privilegios, incluido `EXECUTE` sobre `plataforma.resolver_usuario_auth0`, están en `apps/api/prisma/roles/rol-de-api.sql`. Cómo se aplican y cómo se le pone la clave está en [rol-de-api.md](rol-de-api.md).
 
-El resolutor no crea usuarios. Si Auth0 entrega un `sub` que SIGBA no conoce, la API rechaza el acceso hasta que una invitación o un administrador registre la identidad y su asignación. Para una cuenta sintética de staging, conéctate con `DATABASE_URL`, el dueño de las tablas, y asocia el `iss` y `sub` exactos de Auth0. En Neon el dueño no es superusuario; puede escribir en `usuario` por la política `usuario_administracion`, que solo aplica al rol que corrió la migración:
+El resolutor no crea usuarios. Si Auth0 entrega un `sub` que SIGBA no conoce, la API rechaza el acceso hasta que una invitación o un administrador registre la identidad y su asignación. La invitación lo hace sola: al aceptarla, `plataforma.aceptar_invitacion` crea el usuario con el correo y el nombre de la invitación y le da la asignación (SBA-19, D5). Para una cuenta sintética de staging, conéctate con `DATABASE_URL`, el dueño de las tablas, y asocia el `iss` y `sub` exactos de Auth0. En Neon el dueño no es superusuario; puede escribir en `usuario` por la política `usuario_administracion`, que solo aplica al rol que corrió la migración:
 
 ```sql
 INSERT INTO plataforma.usuario (emisor, auth0_sub, email, nombre)

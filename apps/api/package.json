@@ -29,6 +29,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "jose": "^6.2.12",
+    "nodemailer": "^8.0.11",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
@@ -40,6 +41,7 @@
     "@sigba/config": "workspace:*",
     "@types/express": "^5.0.0",
     "@types/node": "catalog:",
+    "@types/nodemailer": "^8.0.2",
     "@types/supertest": "^7.0.0",
     "@vitest/coverage-v8": "catalog:",
     "ajv": "catalog:",

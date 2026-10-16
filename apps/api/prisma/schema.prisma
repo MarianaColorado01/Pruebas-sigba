@@ -40,6 +40,7 @@ model Banco {
   bodegas       Bodega[]
   parametros    ParametroBanco[]
   usuariosRoles UsuarioRol[]
+  invitaciones  Invitacion[]
 
   @@map("banco")
   @@schema("plataforma")
@@ -72,7 +73,9 @@ model Usuario {
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz
 
-  roles UsuarioRol[]
+  roles                 UsuarioRol[]
+  invitacionesAceptadas Invitacion[] @relation("InvitacionAceptadaPor")
+  invitacionesCreadas   Invitacion[] @relation("InvitacionCreadaPor")
 
   @@unique([emisor, auth0Sub])
   @@map("usuario")
@@ -87,7 +90,8 @@ model Rol {
   creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz
   actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz
 
-  usuarios UsuarioRol[]
+  usuarios     UsuarioRol[]
+  invitaciones Invitacion[]
 
   @@map("rol")
   @@schema("plataforma")
@@ -117,6 +121,34 @@ model UsuarioRol {
 
   @@unique([usuarioId, rolId, bancoId, institucionId])
   @@map("usuario_rol")
+  @@schema("plataforma")
+}
+
+/// Invitación a un banco con un rol (SBA-19, D4 y D5). Solo guarda el SHA-256
+/// del token. La acepta plataforma.aceptar_invitacion, que es SECURITY DEFINER.
+model Invitacion {
+  id            String    @id @default(uuid()) @db.Uuid
+  bancoId       String    @map("banco_id") @db.Uuid
+  email         String    @db.VarChar(200)
+  nombre        String    @db.VarChar(200)
+  rolId         String    @map("rol_id") @db.Uuid
+  /// Sin FK (ADR-05), como en usuario_rol.
+  institucionId String?   @map("institucion_id") @db.Uuid
+  tokenHash     String    @unique @map("token_hash") @db.Char(64)
+  venceEn       DateTime  @map("vence_en") @db.Timestamptz
+  aceptadaEn    DateTime? @map("aceptada_en") @db.Timestamptz
+  aceptadaPorId String?   @map("aceptada_por") @db.Uuid
+  revocadaEn    DateTime? @map("revocada_en") @db.Timestamptz
+  creadoPorId   String    @map("creado_por") @db.Uuid
+  creadoEn      DateTime  @default(now()) @map("creado_en") @db.Timestamptz
+
+  banco       Banco    @relation(fields: [bancoId], references: [id])
+  rol         Rol      @relation(fields: [rolId], references: [id])
+  aceptadaPor Usuario? @relation("InvitacionAceptadaPor", fields: [aceptadaPorId], references: [id], onDelete: Restrict)
+  creadoPor   Usuario  @relation("InvitacionCreadaPor", fields: [creadoPorId], references: [id])
+
+  @@index([bancoId, creadoEn])
+  @@map("invitacion")
   @@schema("plataforma")
 }
 

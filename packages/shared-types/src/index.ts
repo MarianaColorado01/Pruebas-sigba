@@ -161,3 +161,86 @@ export interface PaginaDeAuditoria {
   /** Se manda como `cursor` para pedir los registros anteriores; `null` al final. */
   siguienteCursor: string | null;
 }
+
+/**
+ * Roles que `admin_banco` invita a su banco (D8). `super_admin` se asigna por
+ * SQL e `institucion` se invita desde el directorio de instituciones.
+ */
+export const ROLES_INVITABLES_POR_ADMIN = [
+  'admin_banco',
+  'coordinacion',
+  'operario_bodega',
+  'voluntario',
+  'consulta',
+] as const satisfies readonly Rol[];
+
+export type RolInvitablePorAdmin = (typeof ROLES_INVITABLES_POR_ADMIN)[number];
+
+/**
+ * Respuesta de crear y de reenviar una invitación (D1, D4). El enlace es el
+ * canal principal; `correoEnviado` dice si además salió por correo.
+ *
+ * Invitar otra vez a un correo con invitación pendiente y los mismos datos
+ * devuelve esa invitación con 200 y `yaExistia`: sin correo y sin enlace,
+ * porque solo se guarda el hash del token. Reenviar da un enlace nuevo.
+ */
+export interface InvitacionEmitida {
+  invitacionId: string;
+  enlace: string | null;
+  /** ISO 8601. */
+  venceEn: string;
+  correoEnviado: boolean;
+  yaExistia: boolean;
+}
+
+/** `vencida` es una pendiente cuyo enlace ya no sirve: se puede reenviar. */
+export type EstadoDeInvitacion = 'pendiente' | 'vencida' | 'aceptada';
+
+/** Una fila de `GET /api/v1/invitaciones`. Las revocadas no aparecen. */
+export interface InvitacionDelBanco {
+  id: string;
+  email: string;
+  nombre: string;
+  rol: Rol;
+  estado: EstadoDeInvitacion;
+  venceEn: string;
+  creadoEn: string;
+  aceptadaEn: string | null;
+  /** Quién aceptó, para notar si el enlace llegó a otra persona (D3). */
+  aceptadaPorNombre: string | null;
+}
+
+/**
+ * Por qué no sirve un enlace de invitación. Llega en `codigo` de
+ * `POST /api/v1/invitaciones/aceptar`. Con 410, el enlace mismo: `no_existe`,
+ * `vencida`, `usada` o `revocada`. `correo_en_uso` llega con 409: otra cuenta
+ * de SIGBA ya tiene el correo de la invitación. Con 403, la cuenta: su correo
+ * no está verificado o no es al que se invitó, o la cuenta o el banco están
+ * inactivos.
+ */
+export type MotivoDeInvitacionRechazada =
+  | 'no_existe'
+  | 'vencida'
+  | 'usada'
+  | 'revocada'
+  | 'correo_en_uso'
+  | 'correo_no_verificado'
+  | 'correo_no_coincide'
+  | 'usuario_inactivo'
+  | 'banco_inactivo';
+
+export interface InvitacionAceptada {
+  bancoId: string;
+  rol: Rol;
+}
+
+/** Una asignación activa en el banco, como la lista `GET /api/v1/usuarios`. */
+export interface UsuarioDelBanco {
+  usuarioId: string;
+  nombre: string;
+  email: string;
+  rol: Rol;
+  institucionId: string | null;
+  /** ISO 8601: desde cuándo tiene la asignación. */
+  desde: string;
+}

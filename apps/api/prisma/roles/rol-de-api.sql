@@ -75,6 +75,7 @@ GRANT SELECT, INSERT, UPDATE ON plataforma.bodega TO sigba_app;
 GRANT SELECT, INSERT ON plataforma.parametro_banco TO sigba_app;
 GRANT UPDATE (fecha_fin, valor) ON plataforma.parametro_banco TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON plataforma.usuario_rol TO sigba_app;
+GRANT SELECT, INSERT, UPDATE ON plataforma.invitacion TO sigba_app;
 
 -- plataforma: altas y ediciones de bancos (SBA-19). Solo super_admin escribe:
 -- lo comprueban las políticas banco_alta y banco_edicion. La red y el id no
@@ -146,5 +147,8 @@ GRANT EXECUTE ON FUNCTION plataforma.actua_como_super_admin() TO sigba_app;
 
 -- inventario.sumar_al_saldo (SBA-35) no lleva GRANT: la ejecuta el trigger
 -- del libro, y Postgres no revisa EXECUTE cuando dispara un trigger.
+
+-- Aceptar una invitación antes de tener banco en el contexto (SBA-19, D5).
+GRANT EXECUTE ON FUNCTION plataforma.aceptar_invitacion(text, text, text, text) TO sigba_app;
 
 COMMIT;
