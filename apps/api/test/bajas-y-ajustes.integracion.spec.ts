@@ -288,7 +288,8 @@ describe.skipIf(!URL_ADMIN)('Bajas y ajustes contra PostgreSQL (SBA-42)', () => 
     });
 
     it('un reenvío después de desactivar la bodega devuelve la misma baja, no 404', async () => {
-      const lote = await recibir(25);
+      // La baja deja la bodega en cero: con stock no se puede desactivar (SBA-76).
+      const lote = await recibir(10);
       const comando = baja(lote);
       const primera = await enBanco(bancoA, () => servicio.darDeBaja(comando));
 
@@ -297,7 +298,7 @@ describe.skipIf(!URL_ADMIN)('Bajas y ajustes contra PostgreSQL (SBA-42)', () => 
         const segunda = await enBanco(bancoA, () => servicio.darDeBaja(comando));
 
         expect(segunda).toEqual({ movimiento: primera.movimiento, repetida: true });
-        expect(await saldoDe(lote.loteId)).toEqual(['15', '7.5']);
+        expect(await saldoDe(lote.loteId)).toEqual(['0', '0']);
       } finally {
         await admin.$executeRaw`UPDATE plataforma.bodega SET activa = true WHERE id = ${bodega}::uuid`;
       }

@@ -4,6 +4,7 @@ import { AdministracionDeBodegasService } from './administracion-de-bodegas.serv
 import {
   type FichaDeBodega,
   AdministracionDeBodegasRepositorio,
+  BodegaConStock,
   type CambiosEnBodega,
   type DatosDeBodega,
   NombreDeBodegaRepetido,
@@ -13,6 +14,8 @@ import {
 class RepositorioEnMemoria extends AdministracionDeBodegasRepositorio {
   bodegas: FichaDeBodega[] = [];
   ultimoFiltro?: { soloActivas: boolean };
+  /** Las que el trigger de la base no deja desactivar (SBA-76). */
+  conStock = new Set<string>();
 
   async crear(datos: DatosDeBodega): Promise<FichaDeBodega> {
     this.validar(datos.nombre, undefined, true);
@@ -30,6 +33,9 @@ class RepositorioEnMemoria extends AdministracionDeBodegasRepositorio {
     const bodega = this.bodegas.find((b) => b.id === id);
     if (!bodega) return null;
     if (cambios.nombre) this.validar(cambios.nombre, id);
+    if (cambios.activa === false && bodega.activa && this.conStock.has(id)) {
+      throw new BodegaConStock();
+    }
     return Object.assign(bodega, cambios);
   }
 
@@ -212,6 +218,17 @@ describe('AdministracionDeBodegasService', () => {
       await servicio.desactivar(id);
 
       expect((await servicio.reactivar(id)).activa).toBe(true);
+    });
+
+    it('con stock responde 409 y la bodega sigue activa', async () => {
+      const {
+        bodega: { id },
+      } = await servicio.crear({ nombre: 'Bodega' });
+      repositorio.conStock.add(id);
+
+      await expect(servicio.desactivar(id)).rejects.toThrow(ConflictException);
+      await expect(servicio.desactivar(id)).rejects.toThrow(/todavía tiene stock/);
+      expect(await servicio.listar()).toHaveLength(1);
     });
 
     it('responde 404 si no existe', async () => {

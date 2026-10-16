@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import {
   type FichaDeBodega,
   AdministracionDeBodegasRepositorio,
+  BodegaConStock,
   type CambiosEnBodega,
   NombreDeBodegaRepetido,
 } from './bodega.js';
@@ -83,6 +84,11 @@ export class AdministracionDeBodegasService {
 function conflicto(error: unknown): never {
   if (error instanceof NombreDeBodegaRepetido)
     throw new ConflictException('Ya existe una bodega con ese nombre.');
+  if (error instanceof BodegaConStock) {
+    throw new ConflictException(
+      'La bodega todavía tiene stock. Trasládalo o dalo de baja antes de desactivarla.',
+    );
+  }
   throw error;
 }
 

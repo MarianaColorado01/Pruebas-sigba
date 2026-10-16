@@ -9,6 +9,7 @@ import {
 import {
   type AdministracionDeBodegasRepositorio,
   type Bodega,
+  BodegaConStock,
   BodegasRepositorio,
   type CambiosEnBodega,
   type DatosDeBodega,
@@ -20,6 +21,9 @@ const COLUMNAS = { id: true, nombre: true, direccion: true, activa: true } as co
 
 /** Violación de UNIQUE en PostgreSQL, según Prisma. */
 const UNICIDAD_VIOLADA = 'P2002';
+
+/** El trigger `bodega_sin_desactivar_con_stock` (SBA-76). */
+const CON_STOCK = /bodega_con_stock/;
 
 function bancoDelContexto(): string {
   const bancoId = getTenantContext()?.bancoId;
@@ -138,6 +142,7 @@ async function traducirErrores<R>(
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === UNICIDAD_VIOLADA) {
       throw new NombreDeBodegaRepetido(buscarExistente ? await buscarExistente() : null);
     }
+    if (error instanceof Error && CON_STOCK.test(error.message)) throw new BodegaConStock();
     throw error;
   }
 }

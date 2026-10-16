@@ -41,6 +41,12 @@ export class NombreDeBodegaRepetido extends Error {
   }
 }
 
+/**
+ * La bodega todavía tiene saldo y no se puede desactivar (SBA-76). Lo rechaza
+ * un trigger de la base: primero se traslada o se da de baja lo que queda.
+ */
+export class BodegaConStock extends Error {}
+
 export abstract class AdministracionDeBodegasRepositorio {
   /** @throws NombreDeBodegaRepetido */
   abstract crear(datos: DatosDeBodega): Promise<FichaDeBodega>;
