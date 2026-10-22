@@ -1,6 +1,6 @@
 # ADR-15 · Persona normalizada en beneficiarios, con documento cifrado y HMAC por banco antes del primer dato real
 
-- **Estado:** propuesto
+- **Estado:** aceptado el 21 de octubre de 2026 por Camilo Agudelo, responsable de arquitectura
 - **Fecha:** 24 de septiembre de 2026; ajustado el 29 de septiembre de 2026
 - **Autores:** Juan David Gaitán y Julián Hinestroza (Equipo 1); ajuste de Camilo Agudelo, responsable de arquitectura
 - **Fuente:** esquema M2 v5.0 en [docs/SBA-15](../SBA-15/README.md), SBA-15 y SBA-31

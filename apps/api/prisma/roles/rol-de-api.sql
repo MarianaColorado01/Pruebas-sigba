@@ -127,6 +127,17 @@ GRANT SELECT, INSERT ON inventario.ajuste TO sigba_app;
 -- beneficiarios
 GRANT SELECT, INSERT, UPDATE ON beneficiarios.tipo_poblacion TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON beneficiarios.institucion TO sigba_app;
+-- Registro nominal (SBA-15, migración B). Con institución en el contexto las
+-- políticas solo dejan leer; el consentimiento es append-only. De persona se
+-- editan solo las columnas de la sección 8.1 del esquema: ni el id ni el
+-- documento.
+GRANT SELECT, INSERT ON beneficiarios.persona TO sigba_app;
+GRANT UPDATE (nombres, apellidos, telefono, direccion) ON beneficiarios.persona TO sigba_app;
+GRANT SELECT, INSERT, UPDATE ON beneficiarios.beneficiario TO sigba_app;
+GRANT SELECT, INSERT, UPDATE ON beneficiarios.representacion TO sigba_app;
+GRANT SELECT, INSERT ON beneficiarios.consentimiento TO sigba_app;
+GRANT SELECT, INSERT, UPDATE ON beneficiarios.membresia TO sigba_app;
+GRANT SELECT, INSERT, UPDATE ON beneficiarios.alerta_duplicidad TO sigba_app;
 
 -- 4. Funciones SECURITY DEFINER
 -- Cada migración que cree una función SECURITY DEFINER le quita EXECUTE a

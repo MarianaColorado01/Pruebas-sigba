@@ -381,3 +381,5 @@ export type EventoV1 =
   | MembresiaCerradaV1;
 
 export type TipoDeEvento = EventoV1['tipo'];
+
+export * from './beneficiarios.js';

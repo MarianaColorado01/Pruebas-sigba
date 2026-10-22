@@ -602,6 +602,7 @@ model TipoPoblacion {
   activo  Boolean @default(true)
 
   instituciones Institucion[]
+  beneficiarios Beneficiario[]
 
   @@unique([bancoId, id])
   @@map("tipo_poblacion")
@@ -625,10 +626,208 @@ model Institucion {
   actualizadoPor   String?         @map("actualizado_por") @db.VarChar(100)
   actualizadoEn    DateTime?       @map("actualizado_en") @db.Timestamptz
 
-  tipoPoblacion TipoPoblacion @relation(fields: [bancoId, tipoPoblacionId], references: [bancoId, id])
+  tipoPoblacion TipoPoblacion      @relation(fields: [bancoId, tipoPoblacionId], references: [bancoId, id])
+  membresias    Membresia[]
+  alertas       AlertaDuplicidad[]
 
   @@unique([bancoId, id])
   @@index([bancoId, activa])
   @@map("institucion")
+  @@schema("beneficiarios")
+}
+
+// --- Registro nominal (migración B, SBA-15) ---------------------------------
+// Prisma no expresa los UNIQUE parciales, los CHECK ni las políticas: van a
+// mano en 20261022040000_beneficiarios_registro_nominal.
+
+enum TipoDocumento {
+  cc
+  ce
+  ti
+  pasaporte
+  registro_civil
+  pep
+  ppt
+
+  @@map("tipo_documento")
+  @@schema("beneficiarios")
+}
+
+enum Sexo {
+  masculino
+  femenino
+  prefiero_no_decirlo
+
+  @@map("sexo")
+  @@schema("beneficiarios")
+}
+
+enum Parentesco {
+  madre
+  padre
+  padrastro_madrastra
+  abuelo_a
+  bisabuelo_a
+  hermano_a
+  hermanastro_a
+  tio_a
+  tio_abuelo_a
+  primo_a
+  cunado_a
+  sobrino_a
+  tutor_legal
+  otro
+
+  @@map("parentesco")
+  @@schema("beneficiarios")
+}
+
+enum MotivoFinRepresentacion {
+  mayoria_edad
+  cambio_representante
+  otro
+
+  @@map("motivo_fin_representacion")
+  @@schema("beneficiarios")
+}
+
+enum MotivoFinMembresia {
+  se_mudo
+  dejo_de_asistir
+  fallecio
+  traslado
+  otro
+
+  @@map("motivo_fin_membresia")
+  @@schema("beneficiarios")
+}
+
+enum EstadoAlerta {
+  abierta
+  resuelta
+  descartada
+
+  @@map("estado_alerta")
+  @@schema("beneficiarios")
+}
+
+/// Una fila por ser humano dentro de un banco (ADR-15, D1). El número va en
+/// claro mientras los datos sean sintéticos; SBA-31 lo cambia por
+/// documento_cifrado y documento_hmac antes del primer dato real.
+model Persona {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoId         String        @map("banco_id") @db.Uuid
+  tipoDocumento   TipoDocumento @map("tipo_documento")
+  numeroDocumento String        @map("numero_documento") @db.VarChar(20)
+  nombres         String        @db.VarChar(100)
+  apellidos       String        @db.VarChar(100)
+  sexo            Sexo
+  fechaNacimiento DateTime      @map("fecha_nacimiento") @db.Date
+  telefono        String?       @db.VarChar(30)
+  direccion       String?       @db.VarChar(500)
+
+  beneficiario       Beneficiario?
+  representaciones   Representacion[]
+  consentimientos    Consentimiento[] @relation("titular")
+  consentimientosPor Consentimiento[] @relation("otorgante")
+
+  @@unique([bancoId, id])
+  @@unique([bancoId, numeroDocumento])
+  @@map("persona")
+  @@schema("beneficiarios")
+}
+
+model Beneficiario {
+  personaId       String @id @map("persona_id") @db.Uuid
+  bancoId         String @map("banco_id") @db.Uuid
+  tipoPoblacionId String @map("tipo_poblacion_id") @db.Uuid
+
+  persona          Persona            @relation(fields: [bancoId, personaId], references: [bancoId, id])
+  tipoPoblacion    TipoPoblacion      @relation(fields: [bancoId, tipoPoblacionId], references: [bancoId, id])
+  representaciones Representacion[]
+  membresias       Membresia[]
+  alertas          AlertaDuplicidad[]
+
+  @@unique([bancoId, personaId])
+  @@map("beneficiario")
+  @@schema("beneficiarios")
+}
+
+model Representacion {
+  id                     String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoId                String                   @map("banco_id") @db.Uuid
+  beneficiarioId         String                   @map("beneficiario_id") @db.Uuid
+  representantePersonaId String                   @map("representante_persona_id") @db.Uuid
+  parentesco             Parentesco
+  inicioEn               DateTime                 @default(now()) @map("inicio_en") @db.Timestamptz
+  finEn                  DateTime?                @map("fin_en") @db.Timestamptz
+  motivoFin              MotivoFinRepresentacion? @map("motivo_fin")
+
+  beneficiario  Beneficiario @relation(fields: [bancoId, beneficiarioId], references: [bancoId, personaId])
+  representante Persona      @relation(fields: [bancoId, representantePersonaId], references: [bancoId, id])
+
+  @@map("representacion")
+  @@schema("beneficiarios")
+}
+
+/// Append-only: sin UPDATE ni DELETE para la API (como el libro, ADR-08).
+model Consentimiento {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoId            String   @map("banco_id") @db.Uuid
+  personaId          String   @map("persona_id") @db.Uuid
+  otorgantePersonaId String?  @map("otorgante_persona_id") @db.Uuid
+  recogidoPor        String   @map("recogido_por") @db.VarChar(100)
+  otorgadoEn         DateTime @default(now()) @map("otorgado_en") @db.Timestamptz
+  versionAviso       String   @map("version_aviso") @db.VarChar(20)
+  finalidad          String
+  soporteClave       String?  @map("soporte_clave") @db.VarChar(100)
+
+  persona   Persona  @relation("titular", fields: [bancoId, personaId], references: [bancoId, id], onUpdate: Restrict)
+  otorgante Persona? @relation("otorgante", fields: [bancoId, otorgantePersonaId], references: [bancoId, id], onUpdate: Restrict)
+
+  @@index([bancoId, personaId, otorgadoEn(sort: Desc)])
+  @@map("consentimiento")
+  @@schema("beneficiarios")
+}
+
+/// Una sola activa (fin_en NULL) por beneficiario: UNIQUE parcial en la migración.
+model Membresia {
+  id             String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoId        String              @map("banco_id") @db.Uuid
+  beneficiarioId String              @map("beneficiario_id") @db.Uuid
+  institucionId  String              @map("institucion_id") @db.Uuid
+  inicioEn       DateTime            @default(now()) @map("inicio_en") @db.Timestamptz
+  finEn          DateTime?           @map("fin_en") @db.Timestamptz
+  motivoFin      MotivoFinMembresia? @map("motivo_fin")
+  creadoPor      String              @map("creado_por") @db.VarChar(100)
+  cerradoPor     String?             @map("cerrado_por") @db.VarChar(100)
+
+  beneficiario Beneficiario       @relation(fields: [bancoId, beneficiarioId], references: [bancoId, personaId], onUpdate: Restrict)
+  institucion  Institucion        @relation(fields: [bancoId, institucionId], references: [bancoId, id], onUpdate: Restrict)
+  alertas      AlertaDuplicidad[]
+
+  @@unique([bancoId, id])
+  @@index([institucionId, finEn])
+  @@index([beneficiarioId, inicioEn(sort: Desc)])
+  @@map("membresia")
+  @@schema("beneficiarios")
+}
+
+model AlertaDuplicidad {
+  id                       String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoId                  String       @map("banco_id") @db.Uuid
+  beneficiarioId           String       @map("beneficiario_id") @db.Uuid
+  institucionSolicitanteId String       @map("institucion_solicitante_id") @db.Uuid
+  membresiaVigenteId       String       @map("membresia_vigente_id") @db.Uuid
+  estado                   EstadoAlerta @default(abierta)
+  creadoEn                 DateTime     @default(now()) @map("creado_en") @db.Timestamptz
+  creadoPor                String       @map("creado_por") @db.VarChar(100)
+
+  beneficiario           Beneficiario @relation(fields: [bancoId, beneficiarioId], references: [bancoId, personaId])
+  institucionSolicitante Institucion  @relation(fields: [bancoId, institucionSolicitanteId], references: [bancoId, id])
+  membresiaVigente       Membresia    @relation(fields: [bancoId, membresiaVigenteId], references: [bancoId, id])
+
+  @@index([bancoId, estado, creadoEn])
+  @@map("alerta_duplicidad")
   @@schema("beneficiarios")
 }

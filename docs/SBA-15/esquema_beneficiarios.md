@@ -1,6 +1,6 @@
 # Esquema de datos · SIGBA M2 · Instituciones y beneficiarios
 
-2026-09-29 · versión 5.0 del esquema · schema PostgreSQL `beneficiarios` · propuesta, ver [ADR-15](../adr/ADR-15-persona-normalizada-con-documento-cifrado.md)
+2026-09-29 · versión 5.0 del esquema · schema PostgreSQL `beneficiarios` · diseño de [ADR-15](../adr/ADR-15-persona-normalizada-con-documento-cifrado.md)
 
 ## 1. Qué es y cómo leerlo
 

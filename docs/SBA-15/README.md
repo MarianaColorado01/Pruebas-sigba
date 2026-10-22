@@ -7,11 +7,10 @@ el esquema deja al código. Lo escribieron Juan David Gaitán y Julián Hinestro
 (Equipo 1, backend) después de dos rondas de revisión sobre el ERD del equipo. Camilo
 Agudelo, responsable de arquitectura, lo reestructuró en la versión 5.0.
 
-**Estado: propuesta.** Nada de esto es migración todavía. El esquema entra al
-repositorio para que se pueda revisar y refutar antes de escribir SQL. La
-normalización que introduce se registra en
-[ADR-15](../adr/ADR-15-persona-normalizada-con-documento-cifrado.md), también
-propuesto.
+**Estado: aceptado.** La normalización que introduce se registra en
+[ADR-15](../adr/ADR-15-persona-normalizada-con-documento-cifrado.md), aceptado el
+21 de octubre de 2026. La migración A entró con SBA-26 y la B con SBA-15
+(`20261022040000_beneficiarios_registro_nominal`).
 
 | Archivo                                              | Qué es                                                                                                                                                                                       |
 | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
