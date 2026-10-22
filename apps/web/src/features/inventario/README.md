@@ -18,6 +18,13 @@ semana (amarillo) y este mes (verde a 30 días o menos), lo que vence primero
 arriba. Sin red se recalculan los días y lo vencido; el color queda el último
 que dio la API, porque los umbrales viven allá.
 
+`recepcion/RecepcionPage` registra una donación con red (SBA-80): bodega,
+origen, donante (lo busca o lo crea sin salir), y por referencia la cantidad, el
+lote, el vencimiento y la novedad. Al confirmar, marca «valoración pendiente» en
+las filas sin precio vigente aprobado (ADR-13). Todo envío pasa por
+`useEnviarRecepcion`: la cola sin señal (ADR-10) se monta ahí, recibe el mismo
+comando y devuelve `{ estado: 'pendiente' }` mientras la API no responda.
+
 Consume la API por `src/shared`; los tipos del contrato vienen de
 `@sigba/shared-types`. Los componentes que usen dos features o más suben a
 `packages/ui`.

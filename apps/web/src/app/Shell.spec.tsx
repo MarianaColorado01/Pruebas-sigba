@@ -57,20 +57,20 @@ describe('Shell', () => {
     expect(screen.getByText('Pantalla de inicio')).toBeInTheDocument();
   });
 
-  it('a admin_banco le muestra instituciones, bodegas y usuarios, y no bancos', () => {
+  it('a admin_banco le muestra instituciones, recepción, bodegas y usuarios, y no bancos', () => {
     montar(adminArmenia);
 
-    expect(destinos()).toEqual(['Inicio', 'Instituciones', 'Bodegas', 'Usuarios']);
+    expect(destinos()).toEqual(['Inicio', 'Instituciones', 'Recepción', 'Bodegas', 'Usuarios']);
     expect(screen.getAllByRole('link', { name: 'Bodegas' })[0]).toHaveAttribute(
       'href',
       '/plataforma/bodegas',
     );
   });
 
-  it('a coordinacion le muestra el directorio de instituciones (SBA-86)', () => {
+  it('a coordinacion le muestra el directorio de instituciones (SBA-86) y recepción', () => {
     montar({ ...adminArmenia, rol: 'coordinacion' });
 
-    expect(destinos()).toEqual(['Inicio', 'Instituciones']);
+    expect(destinos()).toEqual(['Inicio', 'Instituciones', 'Recepción']);
     expect(screen.getAllByRole('link', { name: 'Instituciones' })[0]).toHaveAttribute(
       'href',
       '/beneficiarios/instituciones',
@@ -84,8 +84,14 @@ describe('Shell', () => {
     expect(screen.getAllByText('Toda la red')[0]).toBeInTheDocument();
   });
 
-  it('a un rol sin administración solo le muestra inicio', () => {
+  it('al operario de bodega le muestra inicio y recepción', () => {
     montar({ ...adminArmenia, rol: 'operario_bodega' });
+
+    expect(destinos()).toEqual(['Inicio', 'Recepción']);
+  });
+
+  it('a un rol que no registra ni administra solo le muestra inicio', () => {
+    montar({ ...adminArmenia, rol: 'voluntario' });
 
     expect(destinos()).toEqual(['Inicio']);
   });
