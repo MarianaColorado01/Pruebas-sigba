@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Parentesco } from '@sigba/shared-types';
-import { AuditService, executeTransactionWithTenant, PrismaService } from '../../../core/index.js';
+import {
+  AuditService,
+  executeTransactionWithTenant,
+  OutboxService,
+  PrismaService,
+} from '../../../core/index.js';
 import { contextoDeEscritura } from './contexto-de-tenant.js';
 import {
   type Aviso,
@@ -78,6 +83,7 @@ export class RegistroPrismaRepositorio extends RegistroRepositorio {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditService,
+    private readonly outbox: OutboxService,
   ) {
     super();
   }
@@ -202,6 +208,30 @@ export class RegistroPrismaRepositorio extends RegistroRepositorio {
         return membresia;
       },
 
+      cerrarMembresia: async (id, motivoFin) => {
+        // El fin sale del reloj de la base, como el inicio: con el de la API,
+        // un desfase entre los dos haría fallar membresia_fin_despues_de_inicio.
+        // Con RLS, un id de otro banco o ya cerrado es cero filas.
+        const cerradas = await tx.$executeRaw`
+          UPDATE beneficiarios.membresia
+          SET fin_en = now(),
+              motivo_fin = ${motivoFin}::beneficiarios.motivo_fin_membresia,
+              cerrado_por = ${actor}
+          WHERE id = ${id}::uuid AND fin_en IS NULL`;
+        if (cerradas === 0) return null;
+        await this.auditoria.registrar(tx, {
+          accion: 'actualizar',
+          entidad: 'membresia',
+          entidadId: id,
+          detalle: { camposModificados: ['fin_en', 'motivo_fin', 'cerrado_por'] },
+        });
+        return tx.membresia.findUniqueOrThrow({ where: { id }, select: COLUMNAS_MEMBRESIA });
+      },
+
+      emitir: async (evento) => {
+        await this.outbox.emitir(tx, evento);
+      },
+
       abrirAlerta: async (beneficiarioId, institucionId, membresiaVigenteId) => {
         // ON CONFLICT sobre el UNIQUE parcial: un error de UNIQUE dejaría la
         // transacción abortada (sección 7.2, paso 6).
@@ -266,6 +296,26 @@ export class RegistroPrismaRepositorio extends RegistroRepositorio {
         finalidad: FINALIDAD_DEL_REGISTRO,
       });
       return ficha;
+    });
+  }
+
+  async historial(beneficiarioId: string): Promise<Membresia[] | null> {
+    return executeTransactionWithTenant<Membresia[] | null>(this.prisma, async (tx) => {
+      const beneficiario = await tx.beneficiario.findUnique({
+        where: { personaId: beneficiarioId },
+        select: {
+          membresias: { orderBy: { inicioEn: 'desc' }, select: COLUMNAS_MEMBRESIA },
+        },
+      });
+      if (!beneficiario) return null;
+      // Dónde recibió ayuda y por qué se fue también es dato de la persona.
+      await this.auditoria.registrarLectura(tx, {
+        entidad: 'membresia',
+        conjunto: `historial_de_membresias:${beneficiarioId}`,
+        cantidad: beneficiario.membresias.length,
+        finalidad: FINALIDAD_DEL_REGISTRO,
+      });
+      return beneficiario.membresias;
     });
   }
 }

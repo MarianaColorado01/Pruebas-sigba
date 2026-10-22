@@ -1,14 +1,19 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { Ajv2020 } from 'ajv/dist/2020.js';
 import { PrismaClient } from '@prisma/client';
 import { AVISO_DE_PRIVACIDAD } from '@sigba/shared-types';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AuditService } from '../src/core/auditoria/audit.service.js';
+import { OutboxService } from '../src/core/outbox/outbox.service.js';
 import { type PrismaService, runWithTenantContext } from '../src/core/database/index.js';
 import { RegistroPrismaRepositorio } from '../src/modules/beneficiarios/repositories/registro.prisma.repositorio.js';
 import {
   type AltaDeBeneficiario,
   RegistroDeBeneficiariosService,
 } from '../src/modules/beneficiarios/services/registro-de-beneficiarios.service.js';
+import { MembresiasService } from '../src/modules/beneficiarios/services/membresias.service.js';
 import { RegistroSimultaneo } from '../src/modules/beneficiarios/services/registro.js';
 import { urlComoRolApp } from './rol-de-aplicacion.js';
 
@@ -39,6 +44,7 @@ describe.skipIf(!URL_ADMIN)('Registro nominal contra PostgreSQL (SBA-27, SBA-28)
   let admin: PrismaClient;
   let app: PrismaClient;
   let servicio: RegistroDeBeneficiariosService;
+  let membresias: MembresiasService;
 
   function en<R>(bancoId: string, fn: () => Promise<R>): Promise<R> {
     return runWithTenantContext({ bancoId, usuarioId: actor }, fn) as Promise<R>;
@@ -85,6 +91,12 @@ describe.skipIf(!URL_ADMIN)('Registro nominal contra PostgreSQL (SBA-27, SBA-28)
     return Number(fila?.n);
   }
 
+  async function eventos(): Promise<{ tipo: string; version: number; payload: object }[]> {
+    return admin.$queryRaw`
+      SELECT tipo, version, payload FROM core.outbox
+      WHERE banco_id = ${banco}::uuid ORDER BY ocurrido_en, tipo DESC`;
+  }
+
   async function limpiar(): Promise<void> {
     if (bancosUsados.length === 0) return;
     const bancos = bancosUsados.map((b) => `'${b}'`).join(', ');
@@ -107,9 +119,13 @@ describe.skipIf(!URL_ADMIN)('Registro nominal contra PostgreSQL (SBA-27, SBA-28)
   beforeAll(() => {
     admin = new PrismaClient({ datasourceUrl: URL_ADMIN });
     app = new PrismaClient({ datasourceUrl: urlComoRolApp(URL_ADMIN as string) });
-    servicio = new RegistroDeBeneficiariosService(
-      new RegistroPrismaRepositorio(app as PrismaService, new AuditService()),
+    const repositorio = new RegistroPrismaRepositorio(
+      app as PrismaService,
+      new AuditService(),
+      new OutboxService(),
     );
+    servicio = new RegistroDeBeneficiariosService(repositorio);
+    membresias = new MembresiasService(repositorio);
   });
 
   beforeEach(async () => {
@@ -251,5 +267,134 @@ describe.skipIf(!URL_ADMIN)('Registro nominal contra PostgreSQL (SBA-27, SBA-28)
     await en(banco, () => servicio.registrar(alta()));
     const ficha = await en(otroBanco, () => servicio.buscarPorDocumento('1077000001'));
     expect(ficha.persona).toBeNull();
+  });
+
+  describe('membresías y outbox (SBA-28)', () => {
+    const contratos = JSON.parse(
+      readFileSync(
+        fileURLToPath(new URL('../../../docs/eventos/contratos.v1.json', import.meta.url)),
+        'utf8',
+      ),
+    ) as { $id: string };
+    const ajv = new Ajv2020();
+    ajv.addSchema(contratos);
+    const cumpleContrato = (evento: { tipo: string }) =>
+      ajv.getSchema(`${contratos.$id}#/$defs/${evento.tipo}_v1`)?.(evento);
+
+    it('el alta deja MembresiaActivada en el outbox, con el contrato v1 y sin datos personales', async () => {
+      await en(banco, () => servicio.registrar(alta()));
+
+      const [evento, ...otros] = await eventos();
+      expect(otros).toHaveLength(0);
+      expect(evento?.tipo).toBe('MembresiaActivada');
+      expect(cumpleContrato(evento as { tipo: string })).toBe(true);
+      expect(JSON.stringify(evento)).not.toMatch(/1077000001|Ana|Sintética/);
+    });
+
+    it('una duplicidad no deja evento de membresía', async () => {
+      await en(banco, () => servicio.registrar(alta()));
+      await en(banco, () => servicio.registrar(alta({ institucionId: institucionY })));
+      expect((await eventos()).map((e) => e.tipo)).toEqual(['MembresiaActivada']);
+    });
+
+    it('el traslado cierra A con motivo y fecha, abre B y emite los dos eventos (criterio 2)', async () => {
+      const creada = await en(banco, () => servicio.registrar(alta()));
+      const { personaId } = creada as { personaId: string };
+
+      const nueva = await en(banco, () => membresias.trasladar(personaId, institucionY));
+
+      const filas = await admin.$queryRaw<
+        {
+          institucion_id: string;
+          fin_en: Date | null;
+          motivo_fin: string | null;
+          cerrado_por: string | null;
+        }[]
+      >`SELECT institucion_id::text, fin_en, motivo_fin::text, cerrado_por
+        FROM beneficiarios.membresia WHERE banco_id = ${banco}::uuid ORDER BY inicio_en, fin_en NULLS LAST`;
+      expect(filas).toEqual([
+        {
+          institucion_id: institucionX,
+          fin_en: expect.any(Date),
+          motivo_fin: 'traslado',
+          cerrado_por: actor,
+        },
+        { institucion_id: institucionY, fin_en: null, motivo_fin: null, cerrado_por: null },
+      ]);
+      expect(nueva.institucionId).toBe(institucionY);
+      // Las dos fechas salen del now() de la base en la misma transacción.
+      expect(filas[0]?.fin_en).toEqual(nueva.inicioEn);
+      const emitidos = await eventos();
+      expect(emitidos.map((e) => e.tipo).sort()).toEqual(
+        ['MembresiaActivada', 'MembresiaActivada', 'MembresiaCerrada'].sort(),
+      );
+      for (const evento of emitidos) expect(cumpleContrato(evento)).toBe(true);
+    });
+
+    it('un traslado que falla a mitad no deja la membresía cerrada ni eventos', async () => {
+      const { personaId } = (await en(banco, () => servicio.registrar(alta()))) as {
+        personaId: string;
+      };
+      // Simula una falla después del cierre: la segunda membresía activa choca.
+      const repositorio = new RegistroPrismaRepositorio(
+        app as PrismaService,
+        new AuditService(),
+        new OutboxService(),
+      );
+      await expect(
+        en(banco, () =>
+          repositorio.enTransaccion(async (tx) => {
+            const activa = await tx.membresiaActiva(personaId);
+            await tx.cerrarMembresia(activa?.id as string, 'traslado');
+            await tx.emitir({
+              tipo: 'MembresiaCerrada',
+              version: 1,
+              payload: {
+                membresiaId: activa?.id as string,
+                beneficiarioId: personaId,
+                institucionId: institucionX,
+              },
+            });
+            throw new Error('falla simulada');
+          }),
+        ),
+      ).rejects.toThrow('falla simulada');
+
+      const [activa] = await admin.$queryRaw<{ n: bigint }[]>`
+        SELECT count(*) AS n FROM beneficiarios.membresia WHERE banco_id = ${banco}::uuid AND fin_en IS NULL`;
+      expect(Number(activa?.n)).toBe(1);
+      expect(await eventos()).toHaveLength(1);
+    });
+
+    it('cerrar y volver: el historial conserva las dos y la lectura queda en auditoría (criterio 3)', async () => {
+      const creada = (await en(banco, () => servicio.registrar(alta()))) as {
+        personaId: string;
+        membresia: { id: string };
+      };
+      await en(banco, () => membresias.cerrar(creada.membresia.id, 'dejo_de_asistir'));
+      await en(banco, () => servicio.registrar(alta()));
+
+      const historial = await en(banco, () => membresias.historial(creada.personaId));
+
+      expect(historial.map((m) => m.motivoFin)).toEqual([null, 'dejo_de_asistir']);
+      const [lectura] = await admin.$queryRaw<{ entidad_id: string }[]>`
+        SELECT entidad_id FROM core.auditoria
+        WHERE banco_id = ${banco}::uuid AND accion = 'leer' AND entidad = 'membresia'`;
+      expect(lectura?.entidad_id).toBe(`historial_de_membresias:${creada.personaId}`);
+      expect((await eventos()).map((e) => e.tipo)).toEqual([
+        'MembresiaActivada',
+        'MembresiaCerrada',
+        'MembresiaActivada',
+      ]);
+    });
+
+    it('otro banco no cierra la membresía', async () => {
+      const creada = (await en(banco, () => servicio.registrar(alta()))) as {
+        membresia: { id: string };
+      };
+      await expect(
+        en(otroBanco, () => membresias.cerrar(creada.membresia.id, 'otro')),
+      ).rejects.toThrow('No hay una membresía activa');
+    });
   });
 });

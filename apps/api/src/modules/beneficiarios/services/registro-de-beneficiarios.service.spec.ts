@@ -1,6 +1,7 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { AVISO_DE_PRIVACIDAD } from '@sigba/shared-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MembresiasService } from './membresias.service.js';
 import {
   type AltaDeBeneficiario,
   edad,
@@ -8,6 +9,7 @@ import {
   type PersonaRecibida,
   RegistroDeBeneficiariosService,
 } from './registro-de-beneficiarios.service.js';
+import type { EventoDeMembresia } from '../events/membresias.js';
 import {
   type DatosDePersona,
   type FichaDeBeneficiario,
@@ -63,6 +65,7 @@ interface PersonaGuardada extends DatosDePersona {
 
 /** La base en memoria: lo que el adaptador haría con Prisma, sin reglas. */
 class BaseFalsa implements TransaccionDeRegistro {
+  eventos: EventoDeMembresia[] = [];
   personas: PersonaGuardada[] = [];
   representaciones: { beneficiarioId: string; representanteId: string; parentesco: string }[] = [];
   consentimientos: { personaId: string; otorganteId: string | null; version: string }[] = [];
@@ -127,6 +130,16 @@ class BaseFalsa implements TransaccionDeRegistro {
     this.membresias.push(membresia);
     return membresia;
   }
+  async cerrarMembresia(id: string, motivo: Membresia['motivoFin']) {
+    const membresia = this.membresias.find((m) => m.id === id && !m.finEn);
+    if (!membresia) return null;
+    membresia.finEn = new Date();
+    membresia.motivoFin = motivo;
+    return { ...membresia };
+  }
+  async emitir(evento: EventoDeMembresia) {
+    this.eventos.push(evento);
+  }
   async abrirAlerta(beneficiarioId: string, institucionId: string, membresiaVigenteId: string) {
     const abierta = this.alertas.some(
       (a) => a.beneficiarioId === beneficiarioId && a.institucionId === institucionId,
@@ -148,6 +161,10 @@ class RepositorioFalso extends RegistroRepositorio {
     persona: null,
     beneficiario: null,
   }));
+  async historial(beneficiarioId: string) {
+    const propias = this.base.membresias.filter((m) => m.beneficiarioId === beneficiarioId);
+    return propias.length ? propias.reverse() : null;
+  }
 }
 
 describe('RegistroDeBeneficiariosService', () => {
@@ -209,6 +226,22 @@ describe('RegistroDeBeneficiariosService', () => {
         { personaId: 'persona-1', otorganteId: null, version: AVISO_DE_PRIVACIDAD.version },
       ]);
       expect(base.membresias).toHaveLength(1);
+    });
+
+    it('emite MembresiaActivada con solo identificadores (ADR-09, Arquitectura 8.6)', async () => {
+      await servicio.registrar(alta());
+
+      expect(base.eventos).toEqual([
+        {
+          tipo: 'MembresiaActivada',
+          version: 1,
+          payload: {
+            membresiaId: base.membresias[0]?.id,
+            beneficiarioId: 'persona-1',
+            institucionId: institucionX,
+          },
+        },
+      ]);
     });
 
     it('sin consentimiento se rechaza sin escribir (SBA-27, criterio 2)', async () => {
@@ -441,6 +474,7 @@ describe('RegistroDeBeneficiariosService', () => {
       });
       expect(base.membresias).toHaveLength(1);
       expect(base.consentimientos).toHaveLength(consentimientos);
+      expect(base.eventos).toHaveLength(1);
     });
 
     it('en otra institución no crea la membresía y abre una alerta (criterio 1)', async () => {
@@ -450,6 +484,7 @@ describe('RegistroDeBeneficiariosService', () => {
 
       expect(resultado).toEqual({ resultado: 'duplicidad' });
       expect(base.membresias).toHaveLength(1);
+      expect(base.eventos.map((e) => e.tipo)).toEqual(['MembresiaActivada']);
       expect(base.alertas).toEqual([
         {
           beneficiarioId: 'persona-1',
@@ -494,5 +529,99 @@ describe('RegistroDeBeneficiariosService', () => {
 
       expect(base.membresias).toHaveLength(2);
     });
+  });
+});
+
+describe('MembresiasService (SBA-28)', () => {
+  let base: BaseFalsa;
+  let membresias: MembresiasService;
+  let registro: RegistroDeBeneficiariosService;
+
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-21T15:00:00Z'));
+    base = new BaseFalsa();
+    const repositorio = new RepositorioFalso(base);
+    membresias = new MembresiasService(repositorio);
+    registro = new RegistroDeBeneficiariosService(repositorio);
+    await registro.registrar(alta());
+    base.eventos = [];
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const activa = () => base.membresias.find((m) => !m.finEn);
+
+  it('cierra con motivo y fecha, y emite MembresiaCerrada', async () => {
+    const id = activa()?.id as string;
+
+    const cerrada = await membresias.cerrar(id, 'se_mudo');
+
+    expect(cerrada).toMatchObject({ id, motivoFin: 'se_mudo', finEn: expect.any(Date) });
+    expect(base.eventos).toEqual([
+      {
+        tipo: 'MembresiaCerrada',
+        version: 1,
+        payload: { membresiaId: id, beneficiarioId: 'persona-1', institucionId: institucionX },
+      },
+    ]);
+  });
+
+  it('no cierra con motivo traslado ni con uno desconocido', async () => {
+    const id = activa()?.id as string;
+    await expect(membresias.cerrar(id, 'traslado' as 'otro')).rejects.toThrow(BadRequestException);
+    await expect(membresias.cerrar(id, 'enfermo' as 'otro')).rejects.toThrow(BadRequestException);
+    expect(activa()).toBeDefined();
+  });
+
+  it('una membresía cerrada no se cierra otra vez ni se reabre', async () => {
+    const id = activa()?.id as string;
+    await membresias.cerrar(id, 'otro');
+    await expect(membresias.cerrar(id, 'otro')).rejects.toThrow(NotFoundException);
+    expect(base.eventos).toHaveLength(1);
+  });
+
+  it('traslada: cierra A con motivo traslado y abre B, con los dos eventos (criterio 2)', async () => {
+    const anterior = activa()?.id;
+
+    const nueva = await membresias.trasladar('persona-1', institucionY);
+
+    expect(nueva).toMatchObject({ institucionId: institucionY, finEn: null });
+    expect(base.membresias.find((m) => m.id === anterior)).toMatchObject({
+      motivoFin: 'traslado',
+      finEn: expect.any(Date),
+    });
+    expect(base.eventos.map((e) => e.tipo)).toEqual(['MembresiaCerrada', 'MembresiaActivada']);
+  });
+
+  it('no traslada sin membresía activa, a la misma institución ni a una inactiva', async () => {
+    await expect(membresias.trasladar('persona-1', institucionX)).rejects.toThrow(
+      ConflictException,
+    );
+    base.institucionesActivas.delete(institucionY);
+    await expect(membresias.trasladar('persona-1', institucionY)).rejects.toThrow(
+      NotFoundException,
+    );
+    await expect(membresias.trasladar('persona-9', institucionY)).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(base.eventos).toHaveLength(0);
+  });
+
+  it('quien vuelve a A recibe otra membresía y el historial conserva las dos (criterio 3)', async () => {
+    await membresias.cerrar(activa()?.id as string, 'dejo_de_asistir');
+    await registro.registrar(alta());
+
+    const historial = await membresias.historial('persona-1');
+
+    expect(historial).toHaveLength(2);
+    expect(historial[0]).toMatchObject({ finEn: null });
+    expect(historial[1]).toMatchObject({ motivoFin: 'dejo_de_asistir' });
+  });
+
+  it('el historial de un beneficiario que no existe da 404', async () => {
+    await expect(membresias.historial('persona-9')).rejects.toThrow(NotFoundException);
   });
 });

@@ -8,6 +8,7 @@ import {
   TIPOS_DE_DOCUMENTO,
   type TipoDeDocumento,
 } from '@sigba/shared-types';
+import { membresiaActivada } from '../events/membresias.js';
 import {
   type DatosDePersona,
   type FichaDeBeneficiario,
@@ -195,6 +196,7 @@ export class RegistroDeBeneficiariosService {
     await tx.crearConsentimiento(personaId, otorgante ?? null, AVISO_DE_PRIVACIDAD);
 
     const membresia = await tx.crearMembresia(personaId, institucionId);
+    await tx.emitir(membresiaActivada(membresia));
     return { resultado: 'creada', personaId, membresia };
   }
 }

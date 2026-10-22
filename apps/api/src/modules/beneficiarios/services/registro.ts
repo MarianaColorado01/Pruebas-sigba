@@ -12,6 +12,7 @@
  */
 
 import type { MotivoFinDeMembresia, Parentesco, Sexo, TipoDeDocumento } from '@sigba/shared-types';
+import type { EventoDeMembresia } from '../events/membresias.js';
 
 /** Datos de una persona ya validados y normalizados. */
 export interface DatosDePersona {
@@ -89,6 +90,14 @@ export interface TransaccionDeRegistro {
   membresiaActiva(beneficiarioId: string): Promise<Membresia | null>;
   crearMembresia(beneficiarioId: string, institucionId: string): Promise<Membresia>;
   /**
+   * Cierra la membresía si sigue activa, con fecha de hoy y quién la cerró.
+   * Devuelve `null` si no existe en el banco o ya estaba cerrada: una cerrada
+   * no se reabre.
+   */
+  cerrarMembresia(membresiaId: string, motivo: MotivoFinDeMembresia): Promise<Membresia | null>;
+  /** Al outbox, con el mismo cliente: el evento confirma con la escritura (ADR-09). */
+  emitir(evento: EventoDeMembresia): Promise<void>;
+  /**
    * Abre la alerta si no hay otra abierta para la misma persona e institución.
    * Devuelve su id, o `null` si ya estaba abierta.
    */
@@ -108,4 +117,10 @@ export abstract class RegistroRepositorio {
 
   /** Busca por documento y deja la lectura en auditoría (RNF-M2-09). */
   abstract fichaPorDocumento(numeroDocumento: string): Promise<FichaDeBeneficiario>;
+
+  /**
+   * Membresías del beneficiario, de la más reciente a la más antigua, con la
+   * lectura en auditoría. `null` si el beneficiario no existe en el banco.
+   */
+  abstract historial(beneficiarioId: string): Promise<Membresia[] | null>;
 }

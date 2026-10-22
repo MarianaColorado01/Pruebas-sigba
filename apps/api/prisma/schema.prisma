@@ -851,7 +851,8 @@ model Membresia {
   bancoId        String              @map("banco_id") @db.Uuid
   beneficiarioId String              @map("beneficiario_id") @db.Uuid
   institucionId  String              @map("institucion_id") @db.Uuid
-  inicioEn       DateTime            @default(now()) @map("inicio_en") @db.Timestamptz
+  /// Lo pone la base: `@default(now())` lo calcularía Prisma con el reloj de la API.
+  inicioEn       DateTime            @default(dbgenerated("now()")) @map("inicio_en") @db.Timestamptz
   finEn          DateTime?           @map("fin_en") @db.Timestamptz
   motivoFin      MotivoFinMembresia? @map("motivo_fin")
   creadoPor      String              @map("creado_por") @db.VarChar(100)

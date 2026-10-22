@@ -14,7 +14,11 @@ import {
   type TokenVerifier,
 } from '../src/core/index.js';
 import { configurarApp } from '../src/configurar-app.js';
-import { BeneficiariosController } from '../src/modules/beneficiarios/controllers/beneficiarios.controller.js';
+import {
+  BeneficiariosController,
+  MembresiasController,
+} from '../src/modules/beneficiarios/controllers/beneficiarios.controller.js';
+import { MembresiasService } from '../src/modules/beneficiarios/services/membresias.service.js';
 import { RegistroDeBeneficiariosService } from '../src/modules/beneficiarios/services/registro-de-beneficiarios.service.js';
 import { RegistroSimultaneo } from '../src/modules/beneficiarios/services/registro.js';
 
@@ -37,6 +41,7 @@ function conRol(rol: Rol, institucionId: string | null = null): UsuarioConAsigna
 
 const USUARIOS: Record<string, UsuarioConAsignaciones> = {
   coordinacion: conRol('coordinacion'),
+  admin: conRol('admin_banco'),
   voluntario: conRol('voluntario'),
   institucion: conRol('institucion', INSTITUCION),
 };
@@ -73,6 +78,7 @@ const MEMBRESIA = {
 describe('HTTP del registro nominal (SBA-27)', () => {
   let app: INestApplication<Server>;
   const registro = { registrar: vi.fn(), buscarPorDocumento: vi.fn() };
+  const membresias = { cerrar: vi.fn(), trasladar: vi.fn(), historial: vi.fn() };
 
   function como(sub: string, ruta = '/api/v1/beneficiarios') {
     return request(app.getHttpServer())
@@ -84,10 +90,11 @@ describe('HTTP del registro nominal (SBA-27)', () => {
   beforeAll(async () => {
     const modulo = await Test.createTestingModule({
       imports: [CoreModule],
-      controllers: [BeneficiariosController],
+      controllers: [BeneficiariosController, MembresiasController],
       providers: [
         ...GUARDS_GLOBALES,
         { provide: RegistroDeBeneficiariosService, useValue: registro },
+        { provide: MembresiasService, useValue: membresias },
       ],
     })
       .overrideProvider(TOKEN_VERIFIER)
@@ -106,6 +113,7 @@ describe('HTTP del registro nominal (SBA-27)', () => {
   beforeEach(() => {
     registro.registrar.mockReset();
     registro.buscarPorDocumento.mockReset();
+    for (const metodo of Object.values(membresias)) metodo.mockReset();
   });
 
   afterAll(async () => {
@@ -178,5 +186,70 @@ describe('HTTP del registro nominal (SBA-27)', () => {
 
     expect(registro.buscarPorDocumento).toHaveBeenCalledWith('1.077.000.001');
     expect(respuesta.body.beneficiario.membresiaActiva.inicioEn).toBe('2026-10-21T15:00:00.000Z');
+  });
+
+  describe('membresías (SBA-28)', () => {
+    const PERSONA = '01920000-0000-7000-8000-000000000004';
+
+    it('cerrar responde 200 con la membresía; rechaza traslado y texto libre como motivo', async () => {
+      membresias.cerrar.mockResolvedValueOnce({
+        ...MEMBRESIA,
+        finEn: new Date('2026-10-22T10:00:00Z'),
+        motivoFin: 'se_mudo',
+      });
+
+      const respuesta = await como('admin', `/api/v1/membresias/${MEMBRESIA.id}/cerrar`)
+        .send({ motivo: 'se_mudo' })
+        .expect(200);
+
+      expect(respuesta.body).toMatchObject({
+        finEn: '2026-10-22T10:00:00.000Z',
+        motivoFin: 'se_mudo',
+      });
+      await como('admin', `/api/v1/membresias/${MEMBRESIA.id}/cerrar`)
+        .send({ motivo: 'traslado' })
+        .expect(400);
+      await como('admin', `/api/v1/membresias/${MEMBRESIA.id}/cerrar`)
+        .send({ motivo: 'se fue porque estaba enfermo' })
+        .expect(400);
+      await como('admin', '/api/v1/membresias/no-es-uuid/cerrar')
+        .send({ motivo: 'otro' })
+        .expect(400);
+      expect(membresias.cerrar).toHaveBeenCalledTimes(1);
+    });
+
+    it('el traslado es solo de coordinación y responde 201 con la membresía nueva', async () => {
+      membresias.trasladar.mockResolvedValueOnce(MEMBRESIA);
+
+      await como('admin', `/api/v1/beneficiarios/${PERSONA}/traslado`)
+        .send({ institucionId: INSTITUCION })
+        .expect(403);
+      const respuesta = await como('coordinacion', `/api/v1/beneficiarios/${PERSONA}/traslado`)
+        .send({ institucionId: INSTITUCION })
+        .expect(201);
+
+      expect(respuesta.body).toMatchObject({
+        id: MEMBRESIA.id,
+        inicioEn: '2026-10-21T15:00:00.000Z',
+      });
+      expect(membresias.trasladar).toHaveBeenCalledWith(PERSONA, INSTITUCION);
+    });
+
+    it('el historial responde la lista con fechas ISO; voluntario no lo ve', async () => {
+      membresias.historial.mockResolvedValueOnce([MEMBRESIA]);
+
+      const respuesta = await request(app.getHttpServer())
+        .get(`/api/v1/beneficiarios/${PERSONA}/membresias`)
+        .set('Authorization', 'Bearer coordinacion')
+        .set(CABECERAS.banco, BANCO)
+        .expect(200);
+
+      expect(respuesta.body).toEqual([{ ...MEMBRESIA, inicioEn: '2026-10-21T15:00:00.000Z' }]);
+      await request(app.getHttpServer())
+        .get(`/api/v1/beneficiarios/${PERSONA}/membresias`)
+        .set('Authorization', 'Bearer voluntario')
+        .set(CABECERAS.banco, BANCO)
+        .expect(403);
+    });
   });
 });

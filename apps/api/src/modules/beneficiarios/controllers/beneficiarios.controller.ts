@@ -1,13 +1,30 @@
-import { Body, ConflictException, Controller, HttpCode, Post, Res } from '@nestjs/common';
+import {
+  Body,
+  ConflictException,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Res,
+} from '@nestjs/common';
 import type {
   BeneficiarioRegistrado,
   CodigoDeRegistroRechazado,
   FichaDeBeneficiario,
+  HistorialDeMembresias,
   MembresiaDto,
 } from '@sigba/shared-types';
 import type { Response } from 'express';
 import { Roles } from '../../../core/index.js';
-import { BusquedaPorDocumentoDto, RegistrarBeneficiarioDto } from '../dto/registro.dto.js';
+import {
+  BusquedaPorDocumentoDto,
+  CerrarMembresiaDto,
+  RegistrarBeneficiarioDto,
+  TrasladarBeneficiarioDto,
+} from '../dto/registro.dto.js';
+import { MembresiasService } from '../services/membresias.service.js';
 import { RegistroDeBeneficiariosService } from '../services/registro-de-beneficiarios.service.js';
 import { type Membresia, RegistroSimultaneo } from '../services/registro.js';
 
@@ -39,7 +56,10 @@ function rechazo(codigo: CodigoDeRegistroRechazado): ConflictException {
 @Controller('beneficiarios')
 @Roles('coordinacion', 'admin_banco')
 export class BeneficiariosController {
-  constructor(private readonly registro: RegistroDeBeneficiariosService) {}
+  constructor(
+    private readonly registro: RegistroDeBeneficiariosService,
+    private readonly membresias: MembresiasService,
+  ) {}
 
   /** 201 `creada`; 200 `ya_activa`; 409 con `codigo` (`RegistroRechazado`). */
   @Post()
@@ -74,5 +94,47 @@ export class BeneficiariosController {
           beneficiario.membresiaActiva && aMembresiaDto(beneficiario.membresiaActiva),
       },
     };
+  }
+
+  /** Historial de membresías, de la más reciente a la más antigua (SBA-28). */
+  @Get(':personaId/membresias')
+  async historial(
+    @Param('personaId', ParseUUIDPipe) personaId: string,
+  ): Promise<HistorialDeMembresias> {
+    return (await this.membresias.historial(personaId)).map(aMembresiaDto);
+  }
+
+  /** Solo coordinación (SBA-28). Responde la membresía nueva. */
+  @Post(':personaId/traslado')
+  @Roles('coordinacion')
+  async trasladar(
+    @Param('personaId', ParseUUIDPipe) personaId: string,
+    @Body() { institucionId }: TrasladarBeneficiarioDto,
+  ): Promise<MembresiaDto> {
+    try {
+      return aMembresiaDto(await this.membresias.trasladar(personaId, institucionId));
+    } catch (error) {
+      if (error instanceof RegistroSimultaneo) throw rechazo('registro_simultaneo');
+      throw error;
+    }
+  }
+}
+
+/**
+ * Cierre de una membresía con motivo tipificado, sin texto libre (SBA-28,
+ * esquema v5.0 sección 7.8).
+ */
+@Controller('membresias')
+@Roles('coordinacion', 'admin_banco')
+export class MembresiasController {
+  constructor(private readonly membresias: MembresiasService) {}
+
+  @Post(':id/cerrar')
+  @HttpCode(200)
+  async cerrar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() { motivo }: CerrarMembresiaDto,
+  ): Promise<MembresiaDto> {
+    return aMembresiaDto(await this.membresias.cerrar(id, motivo));
   }
 }

@@ -9,6 +9,8 @@ import {
   ValidateNested,
 } from 'class-validator';
 import {
+  MOTIVOS_DE_CIERRE_DE_MEMBRESIA,
+  type MotivoDeCierreDeMembresia,
   PARENTESCOS,
   type Parentesco,
   SEXOS,
@@ -93,4 +95,14 @@ export class RegistrarBeneficiarioDto {
 export class BusquedaPorDocumentoDto {
   @IsString()
   numeroDocumento!: string;
+}
+
+export class CerrarMembresiaDto {
+  @IsIn(MOTIVOS_DE_CIERRE_DE_MEMBRESIA)
+  motivo!: MotivoDeCierreDeMembresia;
+}
+
+export class TrasladarBeneficiarioDto {
+  @IsUUID()
+  institucionId!: string;
 }
