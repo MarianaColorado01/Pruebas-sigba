@@ -322,6 +322,24 @@ export type RecepcionConfirmadaV1 = {
   };
 };
 
+/**
+ * Una línea entregada, con los mismos campos que la recepción. Sin precio
+ * aprobado vigente el día en que la API recibe la salida, `valorUnitario`,
+ * `importe` y `aporte` van en `null`: valoración pendiente, nunca cero
+ * (ADR-13). Sin `aporte_solidario_pct` vigente, solo `aporte` va en `null`.
+ */
+export type DetalleDeSalidaRegistrada = DetalleDeEvento & {
+  categoriaId: string;
+  /** Mayor que cero. */
+  kilos: number;
+  /** Decimal en texto. */
+  valorUnitario: string | null;
+  /** Decimal en texto: cantidad por valor unitario. */
+  importe: string | null;
+  /** Decimal en texto: importe por el porcentaje de aporte solidario. */
+  aporte: string | null;
+};
+
 export type SalidaRegistradaV1 = {
   tipo: 'SalidaRegistrada';
   version: 1;
@@ -331,7 +349,7 @@ export type SalidaRegistradaV1 = {
     bodegaId: string;
     despachadorTipo: 'funcionario' | 'voluntario';
     /** Al menos uno. */
-    detalles: DetalleDeEvento[];
+    detalles: DetalleDeSalidaRegistrada[];
   };
 };
 

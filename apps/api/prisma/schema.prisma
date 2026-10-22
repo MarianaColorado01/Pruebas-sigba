@@ -422,11 +422,12 @@ model Movimiento {
   creadoPor    String         @map("creado_por") @db.VarChar(100)
   creadoEn     DateTime       @default(now()) @map("creado_en") @db.Timestamptz
 
-  lote       Lote              @relation(fields: [bancoId, loteId, referenciaId], references: [bancoId, id, referenciaId], onUpdate: Restrict)
-  detalle    RecepcionDetalle?
-  valoracion Valoracion?
-  baja       Baja?
-  ajuste     Ajuste?
+  lote            Lote              @relation(fields: [bancoId, loteId, referenciaId], references: [bancoId, id, referenciaId], onUpdate: Restrict)
+  detalle         RecepcionDetalle?
+  valoracion      Valoracion?
+  baja            Baja?
+  ajuste          Ajuste?
+  detalleDeSalida SalidaDetalle?
 
   @@id([bancoId, id])
   @@index([bancoId, comandoId])
@@ -506,10 +507,12 @@ model Precio {
   @@schema("inventario")
 }
 
-/// Lo que vale un movimiento que entró sin precio, escrito cuando se aprueba el
-/// precio que cubre su fecha (SBA-43, ADR-13). Fila aparte para que el
-/// movimiento no cambie; append-only como el libro y una sola por movimiento.
-/// `importe` es cantidad × `valorUnitario`, exacto.
+/// Lo que vale un movimiento: una entrada que llegó sin precio, escrita cuando
+/// se aprueba el precio que cubre su fecha (SBA-43), o una salida, al
+/// registrarla con el precio aprobado vigente ese día (SBA-40). ADR-13. Fila
+/// aparte para que el movimiento no cambie; append-only como el libro y una
+/// sola por movimiento. `importe` es la cantidad en positivo × `valorUnitario`,
+/// exacto.
 model Valoracion {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   bancoId       String   @map("banco_id") @db.Uuid
@@ -568,6 +571,58 @@ model Ajuste {
 
   @@id([bancoId, movimientoId])
   @@map("ajuste")
+  @@schema("inventario")
+}
+
+enum TipoDespachador {
+  funcionario
+  voluntario
+
+  @@map("tipo_despachador")
+  @@schema("inventario")
+}
+
+/// Una entrega a una institución desde una bodega (SBA-38). Cada detalle es un
+/// movimiento 'salida' del libro. Un trigger la deja sin UPDATE ni DELETE.
+/// `aportePct` es el aporte solidario vigente ese día; nulo si el banco no lo
+/// tenía, y el aporte queda pendiente (SBA-40).
+model Salida {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoId         String          @map("banco_id") @db.Uuid
+  /// Sin FK: la institución vive en beneficiarios y la valida su dueño (ADR-14).
+  institucionId   String          @map("institucion_id") @db.Uuid
+  /// Sin FK: bodega vive en plataforma (ADR-05).
+  bodegaId        String          @map("bodega_id") @db.Uuid
+  despachador     String          @db.VarChar(200)
+  despachadorTipo TipoDespachador @map("despachador_tipo")
+  aportePct       Decimal?        @map("aporte_pct") @db.Decimal(5, 2)
+  creadoPor       String          @map("creado_por") @db.VarChar(100)
+  creadoEn        DateTime        @default(now()) @map("creado_en") @db.Timestamptz
+
+  detalles SalidaDetalle[]
+
+  @@unique([bancoId, id])
+  @@map("salida")
+  @@schema("inventario")
+}
+
+/// El movimiento de cada fila de una salida. Lote, cantidad y kilos se leen
+/// del movimiento; el valor comercial, de su valoración. Sin UPDATE ni DELETE.
+model SalidaDetalle {
+  bancoId      String   @map("banco_id") @db.Uuid
+  salidaId     String   @map("salida_id") @db.Uuid
+  /// La posición de la fila en la salida, para devolverla en el mismo orden.
+  orden        Int
+  movimientoId String   @map("movimiento_id") @db.Uuid
+  creadoPor    String   @map("creado_por") @db.VarChar(100)
+  creadoEn     DateTime @default(now()) @map("creado_en") @db.Timestamptz
+
+  salida     Salida     @relation(fields: [bancoId, salidaId], references: [bancoId, id], onUpdate: Restrict)
+  movimiento Movimiento @relation(fields: [bancoId, movimientoId], references: [bancoId, id], onUpdate: Restrict)
+
+  @@id([bancoId, movimientoId])
+  @@unique([salidaId, orden])
+  @@map("salida_detalle")
   @@schema("inventario")
 }
 

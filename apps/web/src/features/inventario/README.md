@@ -36,6 +36,20 @@ administración proponen y aprueban; aprobar un valor fuera de la banda pide el
 motivo. Sin precio vigente aprobado, avisa que las recepciones quedan con
 valoración pendiente (ADR-13).
 
+`SalidaPage` registra la entrega a una institución mientras se despacha
+(SBA-38): institución, bodega, y por producto el lote y la cantidad. Sugiere el
+lote que vence primero (FEFO) y deja cambiarlo; lo vencido no aparece. Al
+confirmar muestra el comprobante operativo con valor comercial y aporte, o
+«pendiente» si la referencia no tiene precio aprobado vigente. Todo envío pasa
+por `registrarSalida`, con `comandoId` y `movimientoId` generados en el celular:
+la cola sin señal la envuelve sin tocar la pantalla. Un 409 `sin_stock` avisa y
+vuelve a consultar el stock.
+
+Decisión (SBA-38, SBA-40): la salida se valora con el precio aprobado y el
+porcentaje de aporte vigentes el día en que la API recibe el comando, en hora
+de Colombia. Un comando que se registró sin señal se valora el día en que
+sincroniza, no el día en que se despachó.
+
 Consume la API por `src/shared`; los tipos del contrato vienen de
 `@sigba/shared-types`. Los componentes que usen dos features o más suben a
 `packages/ui`.

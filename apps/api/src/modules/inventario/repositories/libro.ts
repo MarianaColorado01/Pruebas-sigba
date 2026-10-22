@@ -4,6 +4,13 @@ import type { Prisma } from '@prisma/client';
 /** Los CHECK de `inventario.saldo` que rechazan dejar un lote en negativo. */
 const SALDO_NEGATIVO = /saldo_cantidad_no_negativa|saldo_kilos_no_negativos/;
 
+/** Un movimiento dejaría un lote en negativo. Es un 409. */
+export class SaldoInsuficiente extends ConflictException {
+  constructor() {
+    super('No hay saldo suficiente en ese lote y bodega.');
+  }
+}
+
 /**
  * Escribe movimientos en el libro con el `tx` de quien llama (SBA-35, ADR-08).
  *
@@ -34,7 +41,7 @@ export async function escribirEnLibro(
     await tx.movimiento.createMany({ data: ordenados });
   } catch (error) {
     if (error instanceof Error && SALDO_NEGATIVO.test(error.message)) {
-      throw new ConflictException('No hay saldo suficiente en ese lote y bodega.');
+      throw new SaldoInsuficiente();
     }
     throw error;
   }

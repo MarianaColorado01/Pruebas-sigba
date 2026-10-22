@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BeneficiariosModule } from '../beneficiarios/index.js';
 import { PlataformaModule } from '../plataforma/index.js';
 import { BajasYAjustesController } from './controllers/bajas-y-ajustes.controller.js';
 import { DonantesController } from './controllers/donantes.controller.js';
@@ -6,6 +7,7 @@ import { IngresosController } from './controllers/ingresos.controller.js';
 import { PreciosController } from './controllers/precios.controller.js';
 import { RecepcionesController } from './controllers/recepciones.controller.js';
 import { ReferenciasController } from './controllers/referencias.controller.js';
+import { SalidasController } from './controllers/salidas.controller.js';
 import { StockController } from './controllers/stock.controller.js';
 import { BajasYAjustesPrismaRepositorio } from './repositories/bajas-y-ajustes.prisma.repositorio.js';
 import { CategoriasPrismaRepositorio } from './repositories/categorias.prisma.repositorio.js';
@@ -14,6 +16,7 @@ import { IngresosPrismaRepositorio } from './repositories/ingresos.prisma.reposi
 import { PreciosPrismaRepositorio } from './repositories/precios.prisma.repositorio.js';
 import { RecepcionesPrismaRepositorio } from './repositories/recepciones.prisma.repositorio.js';
 import { ReferenciasPrismaRepositorio } from './repositories/referencias.prisma.repositorio.js';
+import { SalidasPrismaRepositorio } from './repositories/salidas.prisma.repositorio.js';
 import { StockPrismaRepositorio } from './repositories/stock.prisma.repositorio.js';
 import { BajasYAjustesRepositorio } from './services/baja-y-ajuste.js';
 import { BajasYAjustesService } from './services/bajas-y-ajustes.service.js';
@@ -29,6 +32,8 @@ import { RecepcionesRepositorio } from './services/recepcion.js';
 import { RecepcionesService } from './services/recepciones.service.js';
 import { ReferenciasRepositorio } from './services/referencia.js';
 import { ReferenciasService } from './services/referencias.service.js';
+import { SalidasRepositorio } from './services/salida.js';
+import { SalidasService } from './services/salidas.service.js';
 import { StockRepositorio } from './services/stock.js';
 import { StockService } from './services/stock.service.js';
 
@@ -40,7 +45,8 @@ import { StockService } from './services/stock.service.js';
  * Arquitectura 5.2. Escribe en el schema `inventario` y en ningún otro.
  */
 @Module({
-  imports: [PlataformaModule],
+  // Beneficiarios valida la institución de una salida (SBA-33, ADR-14).
+  imports: [PlataformaModule, BeneficiariosModule],
   controllers: [
     BajasYAjustesController,
     DonantesController,
@@ -48,6 +54,7 @@ import { StockService } from './services/stock.service.js';
     PreciosController,
     RecepcionesController,
     ReferenciasController,
+    SalidasController,
     StockController,
   ],
   providers: [
@@ -67,6 +74,8 @@ import { StockService } from './services/stock.service.js';
     { provide: IngresosRepositorio, useClass: IngresosPrismaRepositorio },
     StockService,
     { provide: StockRepositorio, useClass: StockPrismaRepositorio },
+    SalidasService,
+    { provide: SalidasRepositorio, useClass: SalidasPrismaRepositorio },
   ],
   exports: [ReferenciasService],
 })

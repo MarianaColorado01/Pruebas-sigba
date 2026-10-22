@@ -63,7 +63,24 @@ const EVENTOS_TIPADOS: { [T in EventoV1['tipo']]: Extract<EventoV1, { tipo: T }>
       institucionId: '00000000-0000-4000-8000-000000000007',
       bodegaId: '00000000-0000-4000-8000-000000000002',
       despachadorTipo: 'voluntario',
-      detalles: [LOTE],
+      detalles: [
+        {
+          ...LOTE,
+          categoriaId: '00000000-0000-4000-8000-000000000015',
+          kilos: 2.5,
+          valorUnitario: '2800',
+          importe: '7000',
+          aporte: '560',
+        },
+        {
+          ...LOTE,
+          categoriaId: LOTE.referenciaId,
+          kilos: 1,
+          valorUnitario: null,
+          importe: null,
+          aporte: null,
+        },
+      ],
     },
   },
   PrecioActualizado: {

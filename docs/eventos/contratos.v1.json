@@ -100,10 +100,24 @@
                 "type": "object",
                 "properties": {
                   "referenciaId": { "$ref": "#/$defs/Uuid" },
+                  "categoriaId": { "$ref": "#/$defs/Uuid" },
                   "loteId": { "$ref": "#/$defs/Uuid" },
-                  "cantidad": { "$ref": "#/$defs/Cantidad" }
+                  "cantidad": { "$ref": "#/$defs/Cantidad" },
+                  "kilos": { "$ref": "#/$defs/Cantidad" },
+                  "valorUnitario": { "$ref": "#/$defs/DecimalONulo" },
+                  "importe": { "$ref": "#/$defs/DecimalONulo" },
+                  "aporte": { "$ref": "#/$defs/DecimalONulo" }
                 },
-                "required": ["referenciaId", "loteId", "cantidad"],
+                "required": [
+                  "referenciaId",
+                  "categoriaId",
+                  "loteId",
+                  "cantidad",
+                  "kilos",
+                  "valorUnitario",
+                  "importe",
+                  "aporte"
+                ],
                 "additionalProperties": false
               }
             }
@@ -126,8 +140,13 @@
             "detalles": [
               {
                 "referenciaId": "00000000-0000-4000-8000-000000000004",
+                "categoriaId": "00000000-0000-4000-8000-000000000015",
                 "loteId": "00000000-0000-4000-8000-000000000005",
-                "cantidad": 2
+                "cantidad": 2,
+                "kilos": 2,
+                "valorUnitario": "2500",
+                "importe": "5000",
+                "aporte": "400"
               }
             ]
           }

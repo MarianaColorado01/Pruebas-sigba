@@ -57,11 +57,12 @@ describe('Shell', () => {
     expect(screen.getByText('Pantalla de inicio')).toBeInTheDocument();
   });
 
-  it('a admin_banco le muestra instituciones, recepción, bajas, precios, bodegas y usuarios, y no bancos', () => {
+  it('a admin_banco le muestra salida, instituciones, recepción, bajas, precios, bodegas y usuarios, y no bancos', () => {
     montar(adminArmenia);
 
     expect(destinos()).toEqual([
       'Inicio',
+      'Salida',
       'Instituciones',
       'Recepción',
       'Bajas',
@@ -75,10 +76,17 @@ describe('Shell', () => {
     );
   });
 
-  it('a coordinacion le muestra instituciones (SBA-86), recepción, bajas y precios', () => {
+  it('a coordinacion le muestra salida, instituciones (SBA-86), recepción, bajas y precios', () => {
     montar({ ...adminArmenia, rol: 'coordinacion' });
 
-    expect(destinos()).toEqual(['Inicio', 'Instituciones', 'Recepción', 'Bajas', 'Precios']);
+    expect(destinos()).toEqual([
+      'Inicio',
+      'Salida',
+      'Instituciones',
+      'Recepción',
+      'Bajas',
+      'Precios',
+    ]);
     expect(screen.getAllByRole('link', { name: 'Instituciones' })[0]).toHaveAttribute(
       'href',
       '/beneficiarios/instituciones',
@@ -92,16 +100,16 @@ describe('Shell', () => {
     expect(screen.getAllByText('Toda la red')[0]).toBeInTheDocument();
   });
 
-  it('al operario de bodega le muestra inicio y recepción', () => {
+  it('al operario de bodega le muestra inicio, salida y recepción', () => {
     montar({ ...adminArmenia, rol: 'operario_bodega' });
 
-    expect(destinos()).toEqual(['Inicio', 'Recepción']);
+    expect(destinos()).toEqual(['Inicio', 'Salida', 'Recepción']);
   });
 
-  it('a un rol que no registra ni administra solo le muestra inicio', () => {
+  it('al voluntario le muestra inicio y salida, sin administración', () => {
     montar({ ...adminArmenia, rol: 'voluntario' });
 
-    expect(destinos()).toEqual(['Inicio']);
+    expect(destinos()).toEqual(['Inicio', 'Salida']);
   });
 
   it('marca el destino actual', () => {

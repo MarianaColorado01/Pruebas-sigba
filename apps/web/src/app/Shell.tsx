@@ -6,6 +6,7 @@ import {
   PackageRemoveIcon,
   MoneyBag02Icon,
   Building06Icon,
+  DeliveryTruck01Icon,
   UnfoldMoreIcon,
   UserGroupIcon,
   WarehouseIcon,
@@ -31,6 +32,12 @@ interface Destino {
 
 const DESTINOS: readonly Destino[] = [
   { a: '/', etiqueta: 'Inicio', icono: Home01Icon },
+  {
+    a: '/salidas/nueva',
+    etiqueta: 'Salida',
+    icono: DeliveryTruck01Icon,
+    roles: ['operario_bodega', 'voluntario', 'coordinacion', 'admin_banco'],
+  },
   {
     a: '/beneficiarios/instituciones',
     etiqueta: 'Instituciones',

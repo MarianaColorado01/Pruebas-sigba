@@ -4,6 +4,7 @@ import { PantallaUsuarios } from '@/features/plataforma/PantallaUsuarios.tsx';
 import { PantallaInstituciones } from '../features/beneficiarios/PantallaInstituciones.tsx';
 import { BajasPage } from '../features/inventario/bajas/BajasPage.tsx';
 import { CatalogoPage } from '../features/inventario/CatalogoPage.tsx';
+import { SalidaPage } from '../features/inventario/SalidaPage.tsx';
 import { SincronizacionPage } from '../features/inventario/SincronizacionPage.tsx';
 import { RecepcionPage } from '../features/inventario/recepcion/RecepcionPage.tsx';
 import { PreciosPage } from '../features/inventario/precios/PreciosPage.tsx';
@@ -40,6 +41,7 @@ export const rutas: RouteObject[] = [
       { path: 'recepcion', element: <RecepcionPage /> },
       { path: 'bajas', element: <BajasPage /> },
       { path: 'precios', element: <PreciosPage /> },
+      { path: 'salidas/nueva', element: <SalidaPage /> },
       { path: 'plataforma/bodegas', element: <PantallaBodegas /> },
       { path: 'plataforma/usuarios', element: <PantallaUsuarios /> },
       { path: 'plataforma/bancos', element: <PantallaBancos /> },

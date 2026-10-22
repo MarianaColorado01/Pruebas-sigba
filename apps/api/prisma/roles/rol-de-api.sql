@@ -123,6 +123,9 @@ GRANT SELECT, INSERT ON inventario.valoracion TO sigba_app;
 -- El motivo de cada baja y cada ajuste (SBA-42): append-only, como su movimiento.
 GRANT SELECT, INSERT ON inventario.baja TO sigba_app;
 GRANT SELECT, INSERT ON inventario.ajuste TO sigba_app;
+-- Salida a institución y su detalle (SBA-38): append-only, como su movimiento.
+GRANT SELECT, INSERT ON inventario.salida TO sigba_app;
+GRANT SELECT, INSERT ON inventario.salida_detalle TO sigba_app;
 
 -- beneficiarios
 GRANT SELECT, INSERT, UPDATE ON beneficiarios.tipo_poblacion TO sigba_app;
