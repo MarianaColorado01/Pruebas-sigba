@@ -1,4 +1,5 @@
 import {
+  Building03Icon,
   Home01Icon,
   Logout01Icon,
   Building06Icon,
@@ -27,6 +28,12 @@ interface Destino {
 
 const DESTINOS: readonly Destino[] = [
   { a: '/', etiqueta: 'Inicio', icono: Home01Icon },
+  {
+    a: '/beneficiarios/instituciones',
+    etiqueta: 'Instituciones',
+    icono: Building03Icon,
+    roles: ['admin_banco', 'coordinacion'],
+  },
   { a: '/plataforma/bodegas', etiqueta: 'Bodegas', icono: WarehouseIcon, roles: ['admin_banco'] },
   { a: '/plataforma/usuarios', etiqueta: 'Usuarios', icono: UserGroupIcon, roles: ['admin_banco'] },
   { a: '/plataforma/bancos', etiqueta: 'Bancos', icono: Building06Icon, roles: ['super_admin'] },

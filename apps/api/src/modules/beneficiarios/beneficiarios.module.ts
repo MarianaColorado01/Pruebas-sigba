@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { InstitucionesController } from './controllers/instituciones.controller.js';
+import { TiposDePoblacionController } from './controllers/tipos-de-poblacion.controller.js';
 import { InstitucionesPrismaRepositorio } from './repositories/instituciones.prisma.repositorio.js';
 import { InstitucionesService } from './repositories/instituciones.service.js';
 import { DirectorioDeInstitucionesService } from './services/directorio-de-instituciones.service.js';
@@ -14,7 +15,7 @@ import { InstitucionesRepositorio } from './services/institucion.js';
  */
 @Module({
   imports: [],
-  controllers: [InstitucionesController],
+  controllers: [InstitucionesController, TiposDePoblacionController],
   providers: [
     DirectorioDeInstitucionesService,
     InstitucionesService,

@@ -47,6 +47,13 @@ export type CambiosEnInstitucion = Partial<
   Omit<Institucion, 'id' | 'actualizadoPor' | 'actualizadoEn'>
 >;
 
+/** Catálogo por banco con el que se clasifica a quién atiende cada institución. */
+export interface TipoDePoblacion {
+  id: string;
+  nombre: string;
+  activo: boolean;
+}
+
 export interface BusquedaDeInstituciones {
   texto?: string;
   tipo?: TipoDeInstitucion;
@@ -64,6 +71,9 @@ export abstract class InstitucionesRepositorio {
   abstract crear(datos: DatosDeInstitucion): Promise<Institucion>;
 
   abstract buscar(busqueda: BusquedaDeInstituciones): Promise<Institucion[]>;
+
+  /** Todos los del banco, activos e inactivos, en orden alfabético. */
+  abstract tiposDePoblacion(): Promise<TipoDePoblacion[]>;
 
   /**
    * Devuelve `null` si la institución no existe en el banco del contexto.

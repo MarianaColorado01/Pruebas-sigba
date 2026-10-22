@@ -3,12 +3,12 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import type { BodegaDto } from '@sigba/shared-types';
 import { type FormEvent, useState } from 'react';
 import { tieneRol, useAsignacion } from '@/shared/sesion';
+import { HojaDeEdicion } from '@/ui/HojaDeEdicion';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { Label } from '@/ui/label';
 import { mensajeDeError, useBodegas } from './datos.ts';
 import { FilaNueva } from './FilaNueva.tsx';
-import { HojaDeEdicion } from './HojaDeEdicion.tsx';
 
 const REPETIDA = 'Ya hay una bodega con ese nombre en este banco.';
 

@@ -39,6 +39,10 @@ describe('API (e2e)', () => {
     return request(app.getHttpServer()).get('/api/v1/instituciones').expect(401);
   });
 
+  it('los tipos de población exigen identidad (SBA-86)', () => {
+    return request(app.getHttpServer()).get('/api/v1/tipos-de-poblacion').expect(401);
+  });
+
   it('no sirve nada fuera del prefijo /api/v1', () => {
     return request(app.getHttpServer()).get('/health').expect(404);
   });

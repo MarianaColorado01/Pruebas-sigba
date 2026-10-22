@@ -3,12 +3,12 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import type { BancoDto } from '@sigba/shared-types';
 import { type FormEvent, useState } from 'react';
 import { tieneRol, useAsignacion } from '@/shared/sesion';
+import { HojaDeEdicion } from '@/ui/HojaDeEdicion';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { Label } from '@/ui/label';
 import { mensajeDeError, useBancos } from './datos.ts';
 import { FilaNueva } from './FilaNueva.tsx';
-import { HojaDeEdicion } from './HojaDeEdicion.tsx';
 
 const REPETIDO = 'Ya hay un banco con ese código en la red.';
 const FORMA_DE_CODIGO = /^[A-Z0-9-]{1,20}$/;

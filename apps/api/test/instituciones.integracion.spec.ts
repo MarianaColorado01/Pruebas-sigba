@@ -175,6 +175,22 @@ describe.skipIf(!URL_ADMIN)('Directorio de instituciones contra PostgreSQL (SBA-
     expect(vistos.map((fila) => fila.id)).toEqual([poblacionB]);
   });
 
+  it('el adaptador solo lista los tipos de población del banco de la petición', async () => {
+    await admin.$executeRawUnsafe(
+      `INSERT INTO beneficiarios.tipo_poblacion (banco_id, nombre, activo)
+       VALUES ('${bancoA}', 'Adultos mayores', false)`,
+    );
+
+    const delA = await enBanco(bancoA, () => repositorio.tiposDePoblacion());
+    const delB = await enBanco(bancoB, () => repositorio.tiposDePoblacion());
+
+    expect(delA.map(({ nombre, activo }) => ({ nombre, activo }))).toEqual([
+      { nombre: 'Adultos mayores', activo: false },
+      { nombre: 'Familias', activo: true },
+    ]);
+    expect(delB.map((tipo) => tipo.id)).toEqual([poblacionB]);
+  });
+
   it('no deja crear un tipo de población con el banco de otro', async () => {
     await expect(
       app.$transaction(async (tx) => {

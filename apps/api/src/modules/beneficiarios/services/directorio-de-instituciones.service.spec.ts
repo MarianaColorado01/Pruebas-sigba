@@ -8,6 +8,7 @@ import {
   type Institucion,
   InstitucionesRepositorio,
   NombreDeInstitucionRepetido,
+  type TipoDePoblacion,
   TipoDePoblacionInexistente,
 } from './institucion.js';
 
@@ -18,6 +19,7 @@ class RepositorioEnMemoria extends InstitucionesRepositorio {
   instituciones: Institucion[] = [];
   ultimaBusqueda?: BusquedaDeInstituciones;
   tiposInexistentes = new Set<string>();
+  tipos: TipoDePoblacion[] = [];
 
   async crear(datos: DatosDeInstitucion): Promise<Institucion> {
     this.validar(datos.nombre, datos.tipoPoblacionId);
@@ -37,6 +39,10 @@ class RepositorioEnMemoria extends InstitucionesRepositorio {
     return this.instituciones.filter(
       (i) => (!busqueda.tipo || i.tipo === busqueda.tipo) && (!busqueda.soloActivas || i.activa),
     );
+  }
+
+  async tiposDePoblacion(): Promise<TipoDePoblacion[]> {
+    return this.tipos;
   }
 
   async actualizar(id: string, cambios: CambiosEnInstitucion): Promise<Institucion | null> {
@@ -210,6 +216,17 @@ describe('DirectorioDeInstitucionesService', () => {
       await expect(servicio.buscar({ tipo: 'club' as unknown as 'parroquia' })).rejects.toThrow(
         BadRequestException,
       );
+    });
+  });
+
+  describe('tiposDePoblacion', () => {
+    it('devuelve también los inactivos, para nombrar el de una institución vieja', async () => {
+      repositorio.tipos = [
+        { id: 'p-1', nombre: 'Adultos mayores', activo: false },
+        { id: 'p-2', nombre: 'Familias', activo: true },
+      ];
+
+      await expect(servicio.tiposDePoblacion()).resolves.toEqual(repositorio.tipos);
     });
   });
 

@@ -9,6 +9,7 @@ import {
   type Institucion,
   InstitucionesRepositorio,
   NombreDeInstitucionRepetido,
+  type TipoDePoblacion,
   TipoDePoblacionInexistente,
 } from '../services/institucion.js';
 
@@ -74,6 +75,15 @@ export class InstitucionesPrismaRepositorio extends InstitucionesRepositorio {
         },
         orderBy: { nombre: 'asc' },
         select: COLUMNAS,
+      }),
+    );
+  }
+
+  async tiposDePoblacion(): Promise<TipoDePoblacion[]> {
+    return executeTransactionWithTenant<TipoDePoblacion[]>(this.prisma, (tx) =>
+      tx.tipoPoblacion.findMany({
+        orderBy: { nombre: 'asc' },
+        select: { id: true, nombre: true, activo: true },
       }),
     );
   }

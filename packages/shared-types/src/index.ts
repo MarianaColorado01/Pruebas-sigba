@@ -120,6 +120,38 @@ export interface BodegaDto {
   activa: boolean;
 }
 
+export type TipoDeInstitucion = 'parroquia' | 'comunidad_religiosa' | 'fundacion';
+
+export type DiaDeRecogida =
+  'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
+
+/**
+ * Institución del directorio del banco, como la devuelve `GET /instituciones`
+ * (SBA-26, RF-M2-01). Una inactiva no se borra: las salidas pasadas la nombran.
+ */
+export interface InstitucionDto {
+  id: string;
+  nombre: string;
+  tipo: TipoDeInstitucion;
+  contactoNombre: string;
+  contactoTelefono: string | null;
+  contactoCorreo: string | null;
+  direccion: string | null;
+  diaRecogida: DiaDeRecogida | null;
+  tipoPoblacionId: string;
+  activa: boolean;
+  actualizadoPor: string | null;
+  /** ISO 8601. */
+  actualizadoEn: string | null;
+}
+
+/** Tipo de población del banco, como lo devuelve `GET /tipos-de-poblacion` (SBA-86). */
+export interface TipoDePoblacionDto {
+  id: string;
+  nombre: string;
+  activo: boolean;
+}
+
 /**
  * Acciones que registra `core.auditoria` (RNF-04). `leer` es una consulta de
  * datos personales: guarda qué conjunto y cuántas filas, nunca su contenido

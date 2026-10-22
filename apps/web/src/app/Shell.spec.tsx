@@ -57,13 +57,23 @@ describe('Shell', () => {
     expect(screen.getByText('Pantalla de inicio')).toBeInTheDocument();
   });
 
-  it('a admin_banco le muestra bodegas y usuarios, y no bancos', () => {
+  it('a admin_banco le muestra instituciones, bodegas y usuarios, y no bancos', () => {
     montar(adminArmenia);
 
-    expect(destinos()).toEqual(['Inicio', 'Bodegas', 'Usuarios']);
+    expect(destinos()).toEqual(['Inicio', 'Instituciones', 'Bodegas', 'Usuarios']);
     expect(screen.getAllByRole('link', { name: 'Bodegas' })[0]).toHaveAttribute(
       'href',
       '/plataforma/bodegas',
+    );
+  });
+
+  it('a coordinacion le muestra el directorio de instituciones (SBA-86)', () => {
+    montar({ ...adminArmenia, rol: 'coordinacion' });
+
+    expect(destinos()).toEqual(['Inicio', 'Instituciones']);
+    expect(screen.getAllByRole('link', { name: 'Instituciones' })[0]).toHaveAttribute(
+      'href',
+      '/beneficiarios/instituciones',
     );
   });
 

@@ -13,6 +13,7 @@ import {
   NombreDeInstitucionRepetido,
   TIPOS_DE_INSTITUCION,
   type TipoDeInstitucion,
+  type TipoDePoblacion,
   TipoDePoblacionInexistente,
 } from './institucion.js';
 
@@ -79,6 +80,14 @@ export class DirectorioDeInstitucionesService {
       ...(filtro.tipo && { tipo: tipoValido(filtro.tipo) }),
       soloActivas: !filtro.incluirInactivas,
     });
+  }
+
+  /**
+   * Las opciones del formulario. Van también los inactivos: una institución
+   * puede seguir con uno y la pantalla tiene que poder nombrarlo.
+   */
+  async tiposDePoblacion(): Promise<TipoDePoblacion[]> {
+    return this.repositorio.tiposDePoblacion();
   }
 
   async editar(id: string, edicion: EdicionDeInstitucion): Promise<Institucion> {
