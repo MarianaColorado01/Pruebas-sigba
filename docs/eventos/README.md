@@ -8,6 +8,15 @@ La lista de M1 reúne eventos citados en SBA-24, SBA-37, SBA-38, SBA-43 y
 SBA-57. El esquema de beneficiarios v5.0 propone cuatro eventos de M2, aunque
 SBA-30 cuenta tres. Por eso los cuatro aparecen aquí como borradores.
 
-Los capitanes de arquitectura y de los equipos consumidores aún deben aprobar
-los nombres y las cargas. No uses estos esquemas como contratos de producción
-hasta recibir esa aprobación.
+Desde el 21 de octubre de 2026 cinco de ellos son v1 y tienen tipo en
+`@sigba/shared-types` (SBA-88): `RecepcionConfirmada`, `PrecioActualizado`,
+`SalidaRegistrada`, `MembresiaActivada` y `MembresiaCerrada`.
+`apps/api/test/contratos-eventos.spec.ts` valida contra el esquema un ejemplo
+escrito con cada tipo. `OutboxService.emitir` recibe cualquier
+`EventoDeDominio`, así que el compilador solo revisa la carga si el emisor la
+marca con `satisfies` y el tipo. Cambiar una carga pide acuerdo del emisor,
+de los consumidores y de arquitectura, y se hace en el esquema y en el tipo a
+la vez.
+
+`LoteProximoAVencer`, `TrasladoConfirmado` y las dos alertas de duplicidad
+siguen en borrador hasta que alguien los emita.

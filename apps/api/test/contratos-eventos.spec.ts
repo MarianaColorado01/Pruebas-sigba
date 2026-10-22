@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Ajv2020, type AnySchemaObject } from 'ajv/dist/2020.js';
+import type { EventoV1 } from '@sigba/shared-types';
 import { describe, expect, it } from 'vitest';
 
 type ContratoDeEvento = AnySchemaObject & {
@@ -20,7 +21,69 @@ const contratos = JSON.parse(
   readFileSync(path.resolve(rutaContratos), 'utf8'),
 ) as CatalogoDeEventos;
 
+const LOTE = {
+  referenciaId: '00000000-0000-4000-8000-000000000004',
+  loteId: '00000000-0000-4000-8000-000000000005',
+  cantidad: 2.5,
+};
+const MEMBRESIA = {
+  membresiaId: '00000000-0000-4000-8000-000000000012',
+  beneficiarioId: '00000000-0000-4000-8000-000000000013',
+  institucionId: '00000000-0000-4000-8000-000000000007',
+};
+
+// Uno por tipo de `EventoV1`: si el tipo de shared-types y el esquema se
+// separan, falla la compilación o la validación.
+const EVENTOS_TIPADOS: { [T in EventoV1['tipo']]: Extract<EventoV1, { tipo: T }> } = {
+  RecepcionConfirmada: {
+    tipo: 'RecepcionConfirmada',
+    version: 1,
+    payload: {
+      recepcionId: '00000000-0000-4000-8000-000000000001',
+      bodegaId: '00000000-0000-4000-8000-000000000002',
+      donanteId: '00000000-0000-4000-8000-000000000003',
+      origen: 'ABACO',
+      detalles: [LOTE],
+    },
+  },
+  SalidaRegistrada: {
+    tipo: 'SalidaRegistrada',
+    version: 1,
+    payload: {
+      salidaId: '00000000-0000-4000-8000-000000000006',
+      institucionId: '00000000-0000-4000-8000-000000000007',
+      bodegaId: '00000000-0000-4000-8000-000000000002',
+      despachadorTipo: 'voluntario',
+      detalles: [LOTE],
+    },
+  },
+  PrecioActualizado: {
+    tipo: 'PrecioActualizado',
+    version: 1,
+    payload: {
+      precioId: '00000000-0000-4000-8000-000000000008',
+      referenciaId: '00000000-0000-4000-8000-000000000004',
+      valor: '2500.5',
+      moneda: 'COP',
+      vigenteDesde: '2026-10-12T05:00:00.000Z',
+    },
+  },
+  MembresiaActivada: { tipo: 'MembresiaActivada', version: 1, payload: MEMBRESIA },
+  MembresiaCerrada: { tipo: 'MembresiaCerrada', version: 1, payload: MEMBRESIA },
+};
+
 describe('contratos de eventos', () => {
+  it('acepta un evento escrito con cada tipo de shared-types', () => {
+    const ajv = new Ajv2020();
+    ajv.addSchema(contratos);
+
+    for (const evento of Object.values(EVENTOS_TIPADOS)) {
+      const validar = ajv.getSchema(`${contratos.$id}#/$defs/${evento.tipo}_v${evento.version}`);
+      expect(validar, evento.tipo).toBeDefined();
+      expect(validar?.(evento), JSON.stringify(validar?.errors)).toBe(true);
+    }
+  });
+
   it('publica cinco borradores de M1 y cuatro de M2', () => {
     expect(
       Object.keys(contratos.$defs)

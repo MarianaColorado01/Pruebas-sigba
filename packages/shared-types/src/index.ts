@@ -2,8 +2,7 @@
  * Contratos compartidos entre la API y la PWA: DTO, enums y eventos.
  *
  * Todo lo que cruza la frontera entre `apps/api` y `apps/web` vive aquí, para
- * que el tipo se defina una sola vez (Arquitectura 5.3). Los contratos de
- * evento de SBA-30 siguen en borrador hasta recibir aprobación.
+ * que el tipo se defina una sola vez (Arquitectura 5.3).
  *
  * Un cambio en este paquete es un cambio de contrato: exige revisión del
  * responsable de arquitectura y del equipo consumidor (Arquitectura 5.2).
@@ -244,3 +243,89 @@ export interface UsuarioDelBanco {
   /** ISO 8601: desde cuándo tiene la asignación. */
   desde: string;
 }
+
+/**
+ * Eventos de dominio v1, tal como los describe `docs/eventos/contratos.v1.json`
+ * (SBA-30, ADR-09). El emisor los escribe en `core.outbox` dentro de su
+ * transacción y los consumidores los reciben por el despachador.
+ *
+ * Las cargas llevan identificadores, nunca datos personales (Arquitectura 8.6).
+ * Cambiar una carga es cambiar el contrato: piden acuerdo del emisor, de los
+ * consumidores y de arquitectura. Un cambio incompatible es una versión nueva.
+ */
+
+/** Una línea de un movimiento: cuánto de qué referencia salió o entró de qué lote. */
+export type DetalleDeEvento = {
+  referenciaId: string;
+  loteId: string;
+  /** Mayor que cero. */
+  cantidad: number;
+};
+
+export type RecepcionConfirmadaV1 = {
+  tipo: 'RecepcionConfirmada';
+  version: 1;
+  payload: {
+    recepcionId: string;
+    bodegaId: string;
+    donanteId: string;
+    origen: 'propia' | 'ABACO' | 'plataforma';
+    /** Al menos uno. */
+    detalles: DetalleDeEvento[];
+  };
+};
+
+export type SalidaRegistradaV1 = {
+  tipo: 'SalidaRegistrada';
+  version: 1;
+  payload: {
+    salidaId: string;
+    institucionId: string;
+    bodegaId: string;
+    despachadorTipo: 'funcionario' | 'voluntario';
+    /** Al menos uno. */
+    detalles: DetalleDeEvento[];
+  };
+};
+
+export type PrecioActualizadoV1 = {
+  tipo: 'PrecioActualizado';
+  version: 1;
+  payload: {
+    precioId: string;
+    referenciaId: string;
+    /** Decimal en texto, con hasta dos decimales: `"2500.00"`. */
+    valor: string;
+    moneda: 'COP';
+    /** Instante ISO 8601 en UTC. */
+    vigenteDesde: string;
+  };
+};
+
+type CargaDeMembresia = {
+  membresiaId: string;
+  beneficiarioId: string;
+  institucionId: string;
+};
+
+export type MembresiaActivadaV1 = {
+  tipo: 'MembresiaActivada';
+  version: 1;
+  payload: CargaDeMembresia;
+};
+
+export type MembresiaCerradaV1 = {
+  tipo: 'MembresiaCerrada';
+  version: 1;
+  payload: CargaDeMembresia;
+};
+
+/** Los eventos que hoy se emiten o se consumen. */
+export type EventoV1 =
+  | RecepcionConfirmadaV1
+  | SalidaRegistradaV1
+  | PrecioActualizadoV1
+  | MembresiaActivadaV1
+  | MembresiaCerradaV1;
+
+export type TipoDeEvento = EventoV1['tipo'];
