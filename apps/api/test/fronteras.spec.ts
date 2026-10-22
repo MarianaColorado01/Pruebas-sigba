@@ -68,6 +68,23 @@ describe('un módulo solo entra a otro por su index.ts', () => {
     expect(errores).toEqual([]);
   });
 
+  it('inventario lee instituciones solo por InstitucionesService (SBA-33)', async () => {
+    const directo = await fronterasDe(
+      'src/modules/inventario/repositories/salidas.prisma.repositorio.ts',
+      `import { InstitucionesPrismaRepositorio } from '../../beneficiarios/repositories/instituciones.prisma.repositorio.js';
+       export const usa = InstitucionesPrismaRepositorio;`,
+    );
+    const publico = await fronterasDe(
+      'src/modules/inventario/repositories/salidas.prisma.repositorio.ts',
+      `import { InstitucionesService } from '../../beneficiarios/index.js';
+       export const usa = InstitucionesService;`,
+    );
+
+    expect(directo).toHaveLength(1);
+    expect(directo[0]).toContain('beneficiarios');
+    expect(publico).toEqual([]);
+  });
+
   it('no estorba dentro del propio módulo', async () => {
     const errores = await fronterasDe(
       'src/modules/inventario/services/salidas.service.ts',

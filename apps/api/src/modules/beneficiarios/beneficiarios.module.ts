@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { InstitucionesController } from './controllers/instituciones.controller.js';
 import { InstitucionesPrismaRepositorio } from './repositories/instituciones.prisma.repositorio.js';
+import { InstitucionesService } from './repositories/instituciones.service.js';
 import { DirectorioDeInstitucionesService } from './services/directorio-de-instituciones.service.js';
 import { InstitucionesRepositorio } from './services/institucion.js';
 
@@ -16,8 +17,9 @@ import { InstitucionesRepositorio } from './services/institucion.js';
   controllers: [InstitucionesController],
   providers: [
     DirectorioDeInstitucionesService,
+    InstitucionesService,
     { provide: InstitucionesRepositorio, useClass: InstitucionesPrismaRepositorio },
   ],
-  exports: [],
+  exports: [InstitucionesService],
 })
 export class BeneficiariosModule {}
