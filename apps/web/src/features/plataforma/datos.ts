@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { BancoDto, BodegaDto } from '@sigba/shared-types';
+import type {
+  BancoDto,
+  BodegaDto,
+  ClaveParametro,
+  ParametroHistorial,
+  ParametroListado,
+} from '@sigba/shared-types';
 import { ErrorDeApi } from '@/shared/clienteHttp';
 import { useAsignacion, usePedir } from '@/shared/sesion';
 
@@ -90,6 +96,51 @@ export function useBancos() {
   });
 
   return { lista, crear, editar, cambiarEstado };
+}
+
+/**
+ * Parámetros del banco de la sesión (SBA-20). Solo `admin_banco`. Una versión
+ * nueva invalida la lista y los historiales, que comparten el prefijo.
+ */
+export function useParametros() {
+  const pedir = usePedir();
+  const bancoId = useAsignacion()?.bancoId;
+  const prefijo = ['plataforma', 'parametros', bancoId];
+  const cliente = useQueryClient();
+
+  const vigentes = useQuery({
+    queryKey: prefijo,
+    queryFn: () => pedir<ParametroListado[]>('/parametros'),
+    enabled: Boolean(bancoId),
+  });
+
+  const programar = useMutation({
+    mutationFn: ({ clave, valor, fechaInicio }: NuevaVersion) =>
+      pedir(`/parametros/${clave}`, {
+        method: 'PUT',
+        body: JSON.stringify({ valor, fechaInicio }),
+      }),
+    onSuccess: () => cliente.invalidateQueries({ queryKey: prefijo }),
+  });
+
+  return { vigentes, programar };
+}
+
+export interface NuevaVersion {
+  clave: ClaveParametro;
+  valor: unknown;
+  fechaInicio: string;
+}
+
+/** Todas las versiones de un parámetro, de la primera a la última. */
+export function useHistorialDeParametro(clave: ClaveParametro) {
+  const pedir = usePedir();
+  const bancoId = useAsignacion()?.bancoId;
+  return useQuery({
+    queryKey: ['plataforma', 'parametros', bancoId, clave],
+    queryFn: () => pedir<ParametroHistorial[]>(`/parametros/${clave}/historial`),
+    enabled: Boolean(bancoId),
+  });
 }
 
 /**

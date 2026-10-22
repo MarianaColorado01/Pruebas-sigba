@@ -11,6 +11,7 @@ import { PreciosPage } from '../features/inventario/precios/PreciosPage.tsx';
 import { StockPage } from '../features/inventario/StockPage.tsx';
 import { PantallaBancos } from '../features/plataforma/PantallaBancos.tsx';
 import { PantallaBodegas } from '../features/plataforma/PantallaBodegas.tsx';
+import { PantallaParametros } from '../features/plataforma/PantallaParametros.tsx';
 import { PantallaDeAuditoria } from '../features/plataforma/auditoria/PantallaDeAuditoria.tsx';
 import { ColaProvider } from './ColaProvider.tsx';
 import { Inicio } from './Inicio.tsx';
@@ -45,6 +46,7 @@ export const rutas: RouteObject[] = [
       { path: 'plataforma/bodegas', element: <PantallaBodegas /> },
       { path: 'plataforma/usuarios', element: <PantallaUsuarios /> },
       { path: 'plataforma/bancos', element: <PantallaBancos /> },
+      { path: 'plataforma/parametros', element: <PantallaParametros /> },
       // Plataforma · auditoría (SBA-51)
       { path: 'plataforma/auditoria', element: <PantallaDeAuditoria /> },
       // Beneficiarios · directorio de instituciones (SBA-86)

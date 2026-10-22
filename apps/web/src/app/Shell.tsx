@@ -7,6 +7,7 @@ import {
   MoneyBag02Icon,
   Building06Icon,
   DeliveryTruck01Icon,
+  SlidersHorizontalIcon,
   UnfoldMoreIcon,
   UserGroupIcon,
   WarehouseIcon,
@@ -64,6 +65,12 @@ const DESTINOS: readonly Destino[] = [
   },
   { a: '/plataforma/bodegas', etiqueta: 'Bodegas', icono: WarehouseIcon, roles: ['admin_banco'] },
   { a: '/plataforma/usuarios', etiqueta: 'Usuarios', icono: UserGroupIcon, roles: ['admin_banco'] },
+  {
+    a: '/plataforma/parametros',
+    etiqueta: 'Parámetros',
+    icono: SlidersHorizontalIcon,
+    roles: ['admin_banco'],
+  },
   { a: '/plataforma/bancos', etiqueta: 'Bancos', icono: Building06Icon, roles: ['super_admin'] },
 ];
 

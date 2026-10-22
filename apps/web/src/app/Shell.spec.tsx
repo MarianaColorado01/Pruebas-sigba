@@ -57,7 +57,7 @@ describe('Shell', () => {
     expect(screen.getByText('Pantalla de inicio')).toBeInTheDocument();
   });
 
-  it('a admin_banco le muestra salida, instituciones, recepción, bajas, precios, bodegas y usuarios, y no bancos', () => {
+  it('a admin_banco le muestra salida, instituciones, recepción, bajas, precios, bodegas, usuarios y parámetros, y no bancos', () => {
     montar(adminArmenia);
 
     expect(destinos()).toEqual([
@@ -69,6 +69,7 @@ describe('Shell', () => {
       'Precios',
       'Bodegas',
       'Usuarios',
+      'Parámetros',
     ]);
     expect(screen.getAllByRole('link', { name: 'Bodegas' })[0]).toHaveAttribute(
       'href',
