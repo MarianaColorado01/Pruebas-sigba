@@ -26,12 +26,15 @@ const CLAVE_ACTOR = 'app.actor';
 /**
  * Fija el contexto dentro de la transacción. Sin contexto escribe cadena vacía,
  * que las políticas tratan como contexto ausente y rechazan (Arquitectura 8.1).
+ * Va en una sola sentencia porque se paga en cada transacción: cuatro idas a la
+ * base por consulta llenaban el pool bajo carga (SBA-97).
  */
 async function fijarContexto(tx: Prisma.TransactionClient, ctx?: TenantContext): Promise<void> {
-  await tx.$executeRaw`SELECT set_config(${CLAVE_BANCO}, ${ctx?.bancoId ?? ''}, true)`;
-  await tx.$executeRaw`SELECT set_config(${CLAVE_INSTITUCION}, ${ctx?.institucionId ?? ''}, true)`;
-  await tx.$executeRaw`SELECT set_config(${CLAVE_USUARIO}, ${ctx?.usuarioId ?? ''}, true)`;
-  await tx.$executeRaw`SELECT set_config(${CLAVE_ACTOR}, ${ctx?.actor ?? ''}, true)`;
+  await tx.$executeRaw`
+    SELECT set_config(${CLAVE_BANCO}, ${ctx?.bancoId ?? ''}, true),
+           set_config(${CLAVE_INSTITUCION}, ${ctx?.institucionId ?? ''}, true),
+           set_config(${CLAVE_USUARIO}, ${ctx?.usuarioId ?? ''}, true),
+           set_config(${CLAVE_ACTOR}, ${ctx?.actor ?? ''}, true)`;
 }
 
 /**

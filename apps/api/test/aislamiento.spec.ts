@@ -123,19 +123,25 @@ describe('La transacción fija el contexto sin concatenar SQL', () => {
       usuarioId: usuario,
     });
 
-    expect(llamadas).toHaveLength(4);
-    for (const llamada of llamadas) {
-      expect(llamada.sql).toContain('set_config');
-      // El valor viaja como parámetro: nunca aparece incrustado en el texto.
-      expect(llamada.sql).not.toContain(banco);
-      expect(llamada.sql).not.toContain(institucion);
-      expect(llamada.sql).not.toContain(usuario);
-    }
+    // Una sola ida a la base por transacción (SBA-97).
+    expect(llamadas).toHaveLength(1);
+    const [llamada] = llamadas;
+    expect(llamada?.sql.match(/set_config/g)).toHaveLength(4);
+    // El valor viaja como parámetro: nunca aparece incrustado en el texto.
+    expect(llamada?.sql).not.toContain(banco);
+    expect(llamada?.sql).not.toContain(institucion);
+    expect(llamada?.sql).not.toContain(usuario);
 
-    expect(llamadas[0]?.valores).toEqual(['app.banco_id', banco]);
-    expect(llamadas[1]?.valores).toEqual(['app.institucion_id', institucion]);
-    expect(llamadas[2]?.valores).toEqual(['app.usuario_id', usuario]);
-    expect(llamadas[3]?.valores).toEqual(['app.actor', '']);
+    expect(llamada?.valores).toEqual([
+      'app.banco_id',
+      banco,
+      'app.institucion_id',
+      institucion,
+      'app.usuario_id',
+      usuario,
+      'app.actor',
+      '',
+    ]);
   });
 
   it('sin contexto envía cadena vacía, que las políticas rechazan', async () => {
@@ -143,10 +149,16 @@ describe('La transacción fija el contexto sin concatenar SQL', () => {
 
     await executeTransactionWithTenant(cliente, async () => 'listo', {});
 
-    expect(llamadas[0]?.valores).toEqual(['app.banco_id', '']);
-    expect(llamadas[1]?.valores).toEqual(['app.institucion_id', '']);
-    expect(llamadas[2]?.valores).toEqual(['app.usuario_id', '']);
-    expect(llamadas[3]?.valores).toEqual(['app.actor', '']);
+    expect(llamadas[0]?.valores).toEqual([
+      'app.banco_id',
+      '',
+      'app.institucion_id',
+      '',
+      'app.usuario_id',
+      '',
+      'app.actor',
+      '',
+    ]);
   });
 
   it('un actor de comando no se usa como identificador de usuario para RLS', async () => {
@@ -157,8 +169,12 @@ describe('La transacción fija el contexto sin concatenar SQL', () => {
       actor: 'importar-codigos',
     });
 
-    expect(llamadas[2]?.valores).toEqual(['app.usuario_id', '']);
-    expect(llamadas[3]?.valores).toEqual(['app.actor', 'importar-codigos']);
+    expect(llamadas[0]?.valores.slice(4)).toEqual([
+      'app.usuario_id',
+      '',
+      'app.actor',
+      'importar-codigos',
+    ]);
   });
 
   it('un identificador con comillas no se convierte en SQL', async () => {
@@ -168,6 +184,6 @@ describe('La transacción fija el contexto sin concatenar SQL', () => {
     await executeTransactionWithTenant(cliente, async () => 'listo', { bancoId: malicioso });
 
     expect(llamadas[0]?.sql).not.toContain('DROP TABLE');
-    expect(llamadas[0]?.valores).toEqual(['app.banco_id', malicioso]);
+    expect(llamadas[0]?.valores.slice(0, 2)).toEqual(['app.banco_id', malicioso]);
   });
 });
