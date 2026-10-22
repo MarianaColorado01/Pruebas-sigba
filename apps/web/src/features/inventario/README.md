@@ -25,6 +25,11 @@ las filas sin precio vigente aprobado (ADR-13). Todo envío pasa por
 `useEnviarRecepcion`: la cola sin señal (ADR-10) se monta ahí, recibe el mismo
 comando y devuelve `{ estado: 'pendiente' }` mientras la API no responda.
 
+`bajas/BajasPage` registra bajas por producto no apto y ajustes de inventario
+con motivo (SBA-81). El lote se elige del stock del banco con su saldo; la baja
+pide uno de los motivos de la lista y el ajuste, si falta o sobra producto y un
+motivo escrito. Todo envío pasa por `useRegistrarMovimiento`.
+
 Consume la API por `src/shared`; los tipos del contrato vienen de
 `@sigba/shared-types`. Los componentes que usen dos features o más suben a
 `packages/ui`.
