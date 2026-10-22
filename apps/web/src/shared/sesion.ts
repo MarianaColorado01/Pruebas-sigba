@@ -39,6 +39,19 @@ function cabecerasDe(asignacion: AsignacionActiva | null, propias?: HeadersInit)
   return cabeceras;
 }
 
+/** Si el error dice que la sesión venció: 401 de la API o Auth0 pidiendo iniciar sesión. */
+export function pideIniciarSesion(error: unknown): boolean {
+  if (error instanceof ErrorDeApi) return error.estado === 401;
+  const codigoAuth0 =
+    typeof error === 'object' && error !== null && 'error' in error ? error.error : undefined;
+  return (
+    typeof codigoAuth0 === 'string' &&
+    ['login_required', 'consent_required', 'missing_refresh_token', 'invalid_grant'].includes(
+      codigoAuth0,
+    )
+  );
+}
+
 /** Las dos formas de llamar a la API; las dos reciben el token al final. */
 type Llamada<R> = (ruta: string, opciones: RequestInit, accessToken?: string) => Promise<R>;
 
@@ -62,18 +75,7 @@ function useLlamadaConSesion() {
           accessToken,
         );
       } catch (error) {
-        const codigoAuth0 =
-          typeof error === 'object' && error !== null && 'error' in error ? error.error : undefined;
-        marcarRequerido(
-          (error instanceof ErrorDeApi && error.estado === 401) ||
-            (typeof codigoAuth0 === 'string' &&
-              [
-                'login_required',
-                'consent_required',
-                'missing_refresh_token',
-                'invalid_grant',
-              ].includes(codigoAuth0)),
-        );
+        marcarRequerido(pideIniciarSesion(error));
         throw error;
       }
     },

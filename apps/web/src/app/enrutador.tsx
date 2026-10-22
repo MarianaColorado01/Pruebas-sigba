@@ -2,10 +2,12 @@ import { createBrowserRouter, type RouteObject } from 'react-router';
 import { PaginaInvitacion } from '@/features/plataforma/PaginaInvitacion.tsx';
 import { PantallaUsuarios } from '@/features/plataforma/PantallaUsuarios.tsx';
 import { CatalogoPage } from '../features/inventario/CatalogoPage.tsx';
+import { SincronizacionPage } from '../features/inventario/SincronizacionPage.tsx';
 import { StockPage } from '../features/inventario/StockPage.tsx';
 import { PantallaBancos } from '../features/plataforma/PantallaBancos.tsx';
 import { PantallaBodegas } from '../features/plataforma/PantallaBodegas.tsx';
 import { PantallaDeAuditoria } from '../features/plataforma/auditoria/PantallaDeAuditoria.tsx';
+import { ColaProvider } from './ColaProvider.tsx';
 import { Inicio } from './Inicio.tsx';
 import { SesionProvider } from './SesionProvider.tsx';
 import { Shell } from './Shell.tsx';
@@ -21,13 +23,16 @@ export const rutas: RouteObject[] = [
   {
     element: (
       <SesionProvider>
-        <Shell />
+        <ColaProvider>
+          <Shell />
+        </ColaProvider>
       </SesionProvider>
     ),
     children: [
       { index: true, element: <Inicio /> },
       { path: 'catalogo', element: <CatalogoPage /> },
       { path: 'stock', element: <StockPage /> },
+      { path: 'sincronizacion', element: <SincronizacionPage /> },
       { path: 'plataforma/bodegas', element: <PantallaBodegas /> },
       { path: 'plataforma/usuarios', element: <PantallaUsuarios /> },
       { path: 'plataforma/bancos', element: <PantallaBancos /> },

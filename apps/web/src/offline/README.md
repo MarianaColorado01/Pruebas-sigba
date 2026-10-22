@@ -11,13 +11,38 @@ muestra la copia sin confirmar con la API. El catálogo no trae datos personales
 en que lo recibió el dispositivo (SBA-36). Vive en su propia base, `sigba-stock`,
 para no tocar el esquema de `sigba-offline`. Tampoco trae datos personales.
 
-La cola de comandos todavía no existe. La secuencia aceptada en ADR-10 es: base
-idempotente en la Iteración 1, libro completo en la 2, cola de recepción en la 3
-y cola de salidas en la 4.
+## Cola de comandos
 
-Cuando llegue, la cola guarda cada comando con `comando_id` UUIDv7, banco,
-usuario, versión y estado (`pendiente`, `confirmado`, `conflicto`), y respeta el
-orden de dependencia al enviar (Arquitectura 6.1).
+`colaDb.ts` guarda los comandos de inventario en su propia base, `sigba-cola`,
+con `comandoId` UUIDv7, banco, usuario (`sub` de Auth0), carga y estado:
+
+- `pendiente`: guardado en el celular, sin respuesta de la API.
+- `enviado`: salió hacia la API. Si la app se cierra antes de la respuesta,
+  vuelve a enviarse; la API lo reconoce por su `comandoId` (Arquitectura 6.1).
+- `confirmado`: la API respondió 200 o 201.
+- `conflicto`: la API lo rechazó (409, validación o regla de negocio). Se guarda
+  con el motivo y no se borra; la coordinación lo concilia (RF-M1-11).
+
+`RUTA_DE_COMANDO` es la lista cerrada de comandos que acepta la cola. Solo
+entran comandos de inventario: nada con datos personales de beneficiarios.
+
+`sincronizar.ts` envía en orden de creación los comandos de la persona en el
+banco activo. Sin red o con un 5xx, el comando sigue pendiente y se reintenta
+a los 2, 4, 8… segundos, hasta un minuto. Con la sesión vencida la cola se
+detiene sin contar el intento y sigue cuando la persona vuelve a entrar.
+
+`app/ColaProvider.tsx` sincroniza al abrir la app, al encolar, al volver la red
+(sin esperar el reintento) y al recuperar la sesión. Una pantalla usa la cola
+así:
+
+```ts
+const { encolar, comandos } = useCola();
+// carga sin comandoId; el comandoId es opcional y se conserva entre reintentos
+const { comandoId } = await encolar('recepcion', carga, comandoId);
+const estado = comandos.find((c) => c.comandoId === comandoId)?.estado;
+```
+
+La pantalla `/sincronizacion` lista lo pendiente y lo que está en conflicto.
 
 Un registro local **no confirma inventario en el servidor**. La interfaz debe
 decir «pendiente de sincronizar» hasta que la API responda.

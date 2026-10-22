@@ -9,7 +9,8 @@ import {
 import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
 import type { Rol } from '@sigba/shared-types';
 import { cn } from 'cn';
-import { NavLink, Outlet } from 'react-router';
+import { Link, NavLink, Outlet } from 'react-router';
+import { useCola } from '@/offline/cola.ts';
 import { SoloPara } from '@/shared/SoloPara.tsx';
 import { Button } from '@/ui/button';
 import { NOMBRE_DE_ROL, nombreDeOpcion } from './eleccionDeBanco.ts';
@@ -104,6 +105,35 @@ function BotonDeBanco({ compacto = false }: { compacto?: boolean }) {
 }
 
 /**
+ * Cuántos registros de este celular faltan por llegar a la API o los rechazó.
+ * No se muestra si no hay ninguno.
+ */
+function IndicadorDeCola() {
+  const { comandos } = useCola();
+  const enConflicto = comandos.filter((comando) => comando.estado === 'conflicto').length;
+  const pendientes = comandos.filter(
+    (comando) => comando.estado === 'pendiente' || comando.estado === 'enviado',
+  ).length;
+  if (enConflicto === 0 && pendientes === 0) return null;
+
+  const partes = [
+    pendientes > 0 && `${pendientes} por sincronizar`,
+    enConflicto > 0 && `${enConflicto} en conflicto`,
+  ].filter(Boolean);
+  return (
+    <Link
+      to="/sincronizacion"
+      className={cn(
+        'flex min-h-11 items-center rounded-md px-3 text-sm font-medium outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring/40',
+        enConflicto > 0 && 'text-destructive',
+      )}
+    >
+      {partes.join(' · ')}
+    </Link>
+  );
+}
+
+/**
  * Marco de la PWA con banco elegido. En el celular, banco arriba y destinos
  * en una barra inferior al alcance del pulgar; en escritorio, una columna
  * lateral como la de Linear. Los destinos dependen del rol activo.
@@ -118,6 +148,7 @@ export function Shell() {
         <nav aria-label="Principal" className="flex flex-col gap-0.5">
           <Enlaces forma="lateral" />
         </nav>
+        <IndicadorDeCola />
         <Button variant="ghost" className="mt-auto justify-start" onClick={cerrarSesion}>
           <HugeiconsIcon icon={Logout01Icon} aria-hidden />
           Cerrar sesión
@@ -126,6 +157,7 @@ export function Shell() {
 
       <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-2 border-b bg-background/95 px-3 backdrop-blur md:hidden">
         <BotonDeBanco compacto />
+        <IndicadorDeCola />
         <Button variant="ghost" size="icon" aria-label="Cerrar sesión" onClick={cerrarSesion}>
           <HugeiconsIcon icon={Logout01Icon} aria-hidden />
         </Button>

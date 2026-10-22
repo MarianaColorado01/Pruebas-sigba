@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useCola } from '@/offline/cola.ts';
 import type { LoteEnStock } from '@/shared/stock.ts';
 import { useStock } from './useStock.ts';
 
@@ -39,6 +40,9 @@ const CLASE_DE_SELECT =
 
 export function StockPage() {
   const stock = useStock();
+  const sinSincronizar = useCola().comandos.filter(
+    (comando) => comando.estado === 'pendiente' || comando.estado === 'enviado',
+  ).length;
   const [bodegaId, setBodegaId] = useState(TODAS);
   const [categoriaId, setCategoriaId] = useState(TODAS);
   const [referenciaId, setReferenciaId] = useState(TODAS);
@@ -80,7 +84,7 @@ export function StockPage() {
         {stock.data
           ? `Última sincronización: ${HORA.format(new Date(stock.data.obtenidoEn))}${
               stock.data.desactualizado ? ' · posiblemente desactualizado' : ''
-            }`
+            }${sinSincronizar > 0 ? ` · no incluye ${sinSincronizar} sin sincronizar` : ''}`
           : stock.isPending
             ? 'Consultando stock…'
             : ''}
