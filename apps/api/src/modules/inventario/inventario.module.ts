@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PlataformaModule } from '../plataforma/index.js';
 import { BajasYAjustesController } from './controllers/bajas-y-ajustes.controller.js';
+import { DonantesController } from './controllers/donantes.controller.js';
 import { IngresosController } from './controllers/ingresos.controller.js';
 import { PreciosController } from './controllers/precios.controller.js';
 import { RecepcionesController } from './controllers/recepciones.controller.js';
@@ -42,6 +43,7 @@ import { StockService } from './services/stock.service.js';
   imports: [PlataformaModule],
   controllers: [
     BajasYAjustesController,
+    DonantesController,
     IngresosController,
     PreciosController,
     RecepcionesController,

@@ -25,6 +25,7 @@ class RepositorioEnMemoria extends DonantesRepositorio {
     return this.donantes.filter(
       (d) =>
         (!busqueda.id || d.id === busqueda.id) &&
+        (!busqueda.texto || d.nombre.toLowerCase().includes(busqueda.texto.toLowerCase())) &&
         (!busqueda.tipo || d.tipo === busqueda.tipo) &&
         (!busqueda.soloActivos || d.activo),
     );
@@ -48,6 +49,35 @@ describe('DonantesService', () => {
   });
 
   describe('crear', () => {
+    it('devuelve el donante activo con el mismo nombre y tipo en vez de duplicarlo', async () => {
+      const primero = await servicio.darDeAlta({ nombre: 'Parroquia San José', tipo: 'parroquia' });
+      const segundo = await servicio.darDeAlta({
+        nombre: ' parroquia  san josé ',
+        tipo: 'parroquia',
+      });
+
+      expect(primero.repetido).toBe(false);
+      expect(segundo).toEqual({ donante: primero.donante, repetido: true });
+      expect(repositorio.donantes).toHaveLength(1);
+    });
+
+    it('crea otro si el nombre coincide pero el tipo no, o si el existente está inactivo', async () => {
+      const { donante } = await servicio.darDeAlta({ nombre: 'Juan', tipo: 'particular' });
+      await servicio.darDeAlta({ nombre: 'Juan', tipo: 'empresa' });
+      await servicio.desactivar(donante.id);
+      const otro = await servicio.darDeAlta({ nombre: 'Juan', tipo: 'particular' });
+
+      expect(otro.repetido).toBe(false);
+      expect(repositorio.donantes).toHaveLength(3);
+    });
+
+    it('no confunde un nombre que solo contiene al otro', async () => {
+      await servicio.darDeAlta({ nombre: 'Almacén Éxito', tipo: 'empresa' });
+      const exito = await servicio.darDeAlta({ nombre: 'Éxito', tipo: 'empresa' });
+
+      expect(exito.repetido).toBe(false);
+    });
+
     it('da de alta con solo nombre y tipo, sin contacto', async () => {
       const donante = await servicio.crear({ nombre: 'Parroquia San José', tipo: 'parroquia' });
 
