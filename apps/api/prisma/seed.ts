@@ -13,7 +13,8 @@
  * veces deja lo mismo. El banco cuelga de la red ABACO, que crea la migración
  * de SBA-19 con id fijo (D12 de docs/arquitectura/plataforma-sba-19.md).
  */
-import { PrismaClient } from '@prisma/client';
+import { type Prisma, PrismaClient } from '@prisma/client';
+import { AVISO_DE_PRIVACIDAD } from '@sigba/shared-types';
 
 const RED_ABACO = '00000000-0000-4000-8000-00000000abac';
 const BANCO_ID = '00000000-0000-4000-8000-000000000002';
@@ -153,7 +154,82 @@ async function sembrar(): Promise<void> {
         VALUES (${BANCO_ID}::uuid, ${nombre})
         ON CONFLICT (banco_id, lower(nombre)) DO NOTHING`;
     }
+
+    await sembrarRegistroNominal(tx);
   });
+}
+
+/**
+ * Registro nominal sintético (SBA-27): una parroquia, una adulta y una menor
+ * con su representante, con consentimiento y membresía activa. Documentos del
+ * rango 999…, que ninguna cédula real usa. Ningún dato real hasta la firma del
+ * convenio (SBA-16).
+ */
+async function sembrarRegistroNominal(tx: Prisma.TransactionClient): Promise<void> {
+  const institucion = '00000000-0000-4000-8000-0000000b0001';
+  const ana = '00000000-0000-4000-8000-0000000b0101';
+  const sofia = '00000000-0000-4000-8000-0000000b0102';
+  const luis = '00000000-0000-4000-8000-0000000b0103';
+
+  const [poblacion] = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id::text FROM beneficiarios.tipo_poblacion
+    WHERE banco_id = ${BANCO_ID}::uuid AND nombre = 'Familias'`;
+  if (!poblacion) throw new Error('Falta el tipo de población Familias.');
+
+  await tx.$executeRaw`
+    INSERT INTO beneficiarios.institucion (id, banco_id, nombre, tipo, contacto_nombre, tipo_poblacion_id)
+    VALUES (${institucion}::uuid, ${BANCO_ID}::uuid, 'Parroquia sintética', 'parroquia',
+            'Contacto sintético', ${poblacion.id}::uuid)
+    ON CONFLICT DO NOTHING`;
+
+  const personas = [
+    [ana, 'cc', '999000001', 'Ana', 'Prueba', 'femenino', '1980-01-01'],
+    [sofia, 'registro_civil', '999000002', 'Sofía', 'Prueba', 'femenino', '2019-04-04'],
+    [luis, 'cc', '999000003', 'Luis', 'Prueba', 'masculino', '1985-03-03'],
+  ] as const;
+  for (const [id, tipo, numero, nombres, apellidos, sexo, nacimiento] of personas) {
+    await tx.$executeRaw`
+      INSERT INTO beneficiarios.persona
+        (id, banco_id, tipo_documento, numero_documento, nombres, apellidos, sexo, fecha_nacimiento)
+      VALUES (${id}::uuid, ${BANCO_ID}::uuid, ${tipo}::beneficiarios.tipo_documento, ${numero},
+              ${nombres}, ${apellidos}, ${sexo}::beneficiarios.sexo, ${nacimiento}::date)
+      ON CONFLICT DO NOTHING`;
+  }
+
+  for (const beneficiario of [ana, sofia]) {
+    await tx.$executeRaw`
+      INSERT INTO beneficiarios.beneficiario (persona_id, banco_id, tipo_poblacion_id)
+      VALUES (${beneficiario}::uuid, ${BANCO_ID}::uuid, ${poblacion.id}::uuid)
+      ON CONFLICT DO NOTHING`;
+  }
+
+  await tx.$executeRaw`
+    INSERT INTO beneficiarios.representacion (banco_id, beneficiario_id, representante_persona_id, parentesco)
+    VALUES (${BANCO_ID}::uuid, ${sofia}::uuid, ${luis}::uuid, 'padre')
+    ON CONFLICT DO NOTHING`;
+
+  // El consentimiento es append-only: se siembra solo si la persona no tiene.
+  for (const [persona, otorgante] of [
+    [ana, null],
+    [luis, null],
+    [sofia, luis],
+  ] as const) {
+    await tx.$executeRaw`
+      INSERT INTO beneficiarios.consentimiento
+        (banco_id, persona_id, otorgante_persona_id, recogido_por, version_aviso, finalidad)
+      SELECT ${BANCO_ID}::uuid, ${persona}::uuid, ${otorgante}::uuid, 'semilla',
+             ${AVISO_DE_PRIVACIDAD.version}, ${AVISO_DE_PRIVACIDAD.finalidad}
+      WHERE NOT EXISTS (
+        SELECT 1 FROM beneficiarios.consentimiento WHERE persona_id = ${persona}::uuid
+      )`;
+  }
+
+  for (const beneficiario of [ana, sofia]) {
+    await tx.$executeRaw`
+      INSERT INTO beneficiarios.membresia (banco_id, beneficiario_id, institucion_id, creado_por)
+      VALUES (${BANCO_ID}::uuid, ${beneficiario}::uuid, ${institucion}::uuid, 'semilla')
+      ON CONFLICT (beneficiario_id) WHERE fin_en IS NULL DO NOTHING`;
+  }
 }
 
 try {
