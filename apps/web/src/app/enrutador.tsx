@@ -6,6 +6,7 @@ import { BajasPage } from '../features/inventario/bajas/BajasPage.tsx';
 import { CatalogoPage } from '../features/inventario/CatalogoPage.tsx';
 import { SincronizacionPage } from '../features/inventario/SincronizacionPage.tsx';
 import { RecepcionPage } from '../features/inventario/recepcion/RecepcionPage.tsx';
+import { PreciosPage } from '../features/inventario/precios/PreciosPage.tsx';
 import { StockPage } from '../features/inventario/StockPage.tsx';
 import { PantallaBancos } from '../features/plataforma/PantallaBancos.tsx';
 import { PantallaBodegas } from '../features/plataforma/PantallaBodegas.tsx';
@@ -38,6 +39,7 @@ export const rutas: RouteObject[] = [
       { path: 'sincronizacion', element: <SincronizacionPage /> },
       { path: 'recepcion', element: <RecepcionPage /> },
       { path: 'bajas', element: <BajasPage /> },
+      { path: 'precios', element: <PreciosPage /> },
       { path: 'plataforma/bodegas', element: <PantallaBodegas /> },
       { path: 'plataforma/usuarios', element: <PantallaUsuarios /> },
       { path: 'plataforma/bancos', element: <PantallaBancos /> },

@@ -30,6 +30,12 @@ con motivo (SBA-81). El lote se elige del stock del banco con su saldo; la baja
 pide uno de los motivos de la lista y el ajuste, si falta o sobra producto y un
 motivo escrito. Todo envío pasa por `useRegistrarMovimiento`.
 
+`precios/PreciosPage` muestra, por referencia, el precio vigente de hoy y el
+historial con banda, fuente, evidencia y vigencia (SBA-82). Coordinación y
+administración proponen y aprueban; aprobar un valor fuera de la banda pide el
+motivo. Sin precio vigente aprobado, avisa que las recepciones quedan con
+valoración pendiente (ADR-13).
+
 Consume la API por `src/shared`; los tipos del contrato vienen de
 `@sigba/shared-types`. Los componentes que usen dos features o más suben a
 `packages/ui`.
