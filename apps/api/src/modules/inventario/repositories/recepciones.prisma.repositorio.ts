@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { DetalleDeRecepcionConfirmada, RecepcionConfirmadaV1 } from '@sigba/shared-types';
 import {
   AuditService,
   executeTransactionWithTenant,
   IdempotenciaService,
+  OutboxService,
   PrismaService,
 } from '../../../core/index.js';
 import { contexto } from './contexto-de-tenant.js';
@@ -47,9 +49,9 @@ type FilaDeRecepcion = Prisma.RecepcionGetPayload<{ select: typeof COLUMNAS }>;
 
 /**
  * Adaptador de Prisma para la recepción. Reclamo del comando, recepción,
- * lotes, movimientos, detalles y auditoría van en una sola
+ * lotes, movimientos, detalles, auditoría y evento van en una sola
  * `executeTransactionWithTenant`, con el mismo `tx`: si algo falla no queda
- * nada, ni siquiera la reserva del comando (ADR-08, Arquitectura 6.1).
+ * nada, ni siquiera la reserva del comando (ADR-08, ADR-09, Arquitectura 6.1).
  */
 @Injectable()
 export class RecepcionesPrismaRepositorio extends RecepcionesRepositorio {
@@ -57,6 +59,7 @@ export class RecepcionesPrismaRepositorio extends RecepcionesRepositorio {
     private readonly prisma: PrismaService,
     private readonly idempotencia: IdempotenciaService,
     private readonly auditoria: AuditService,
+    private readonly outbox: OutboxService,
   ) {
     super();
   }
@@ -154,8 +157,19 @@ export class RecepcionesPrismaRepositorio extends RecepcionesRepositorio {
           entidadId: recepcionId,
           detalle: { cantidad: filas.length },
         });
-        // RecepcionConfirmada va aquí, con este mismo `tx`, cuando exista el
-        // outbox (SBA-30).
+        // Después de valorar: cada detalle sale con su importe o en null si
+        // quedó pendiente. Un reenvío salió arriba y no emite otra vez.
+        await this.outbox.emitir(tx, {
+          tipo: 'RecepcionConfirmada',
+          version: 1,
+          payload: {
+            recepcionId,
+            bodegaId: cabecera.bodegaId,
+            donanteId: cabecera.donanteId,
+            origen: cabecera.origen,
+            detalles: await detallesDelEvento(tx, bancoId, recepcionId),
+          },
+        } satisfies RecepcionConfirmadaV1);
 
         const fila = await tx.recepcion.findUniqueOrThrow({
           where: { id: recepcionId },
@@ -197,6 +211,31 @@ export class RecepcionesPrismaRepositorio extends RecepcionesRepositorio {
       return { recepcion: aRecepcion(fila), repetida: true };
     });
   }
+}
+
+/** Los detalles como los pide el contrato, con la categoría y la valoración ya escrita. */
+async function detallesDelEvento(
+  tx: Prisma.TransactionClient,
+  bancoId: string,
+  recepcionId: string,
+): Promise<DetalleDeRecepcionConfirmada[]> {
+  const filas = await tx.$queryRaw<
+    (Omit<DetalleDeRecepcionConfirmada, 'cantidad' | 'kilos'> & {
+      cantidad: string;
+      kilos: string;
+    })[]
+  >`
+    SELECT m.referencia_id::text AS "referenciaId", p.categoria_id::text AS "categoriaId",
+           m.lote_id::text AS "loteId", m.cantidad::text AS cantidad, m.kilos::text AS kilos,
+           v.valor_unitario::text AS "valorUnitario", v.importe::text AS importe
+    FROM inventario.recepcion_detalle AS d
+    JOIN inventario.movimiento AS m ON m.banco_id = d.banco_id AND m.id = d.movimiento_id
+    JOIN inventario.referencia AS r ON r.banco_id = m.banco_id AND r.id = m.referencia_id
+    JOIN inventario.producto AS p ON p.banco_id = r.banco_id AND p.id = r.producto_id
+    LEFT JOIN inventario.valoracion AS v ON v.banco_id = m.banco_id AND v.movimiento_id = m.id
+    WHERE d.banco_id = ${bancoId}::uuid AND d.recepcion_id = ${recepcionId}::uuid
+    ORDER BY d.orden`;
+  return filas.map((f) => ({ ...f, cantidad: Number(f.cantidad), kilos: Number(f.kilos) }));
 }
 
 function aRecepcion(fila: FilaDeRecepcion): Recepcion {

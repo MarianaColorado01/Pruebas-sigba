@@ -1,9 +1,12 @@
+import { readFileSync } from 'node:fs';
 import { PrismaClient } from '@prisma/client';
+import { Ajv2020 } from 'ajv/dist/2020.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   AuditService,
   executeTransactionWithTenant,
   IdempotenciaService,
+  OutboxService,
   type PrismaService,
   runWithTenantContext,
 } from '../src/core/index.js';
@@ -103,6 +106,7 @@ describe.skipIf(!URL_ADMIN)('Valoración tardía contra PostgreSQL (SBA-43)', ()
         admin.$executeRawUnsafe(`DELETE FROM inventario.${tabla} WHERE ${enBancos}`),
       ),
       admin.$executeRawUnsafe(`DELETE FROM core.comando_procesado WHERE ${enBancos}`),
+      admin.$executeRawUnsafe(`DELETE FROM core.outbox WHERE ${enBancos}`),
     ]);
   }
 
@@ -241,12 +245,14 @@ describe.skipIf(!URL_ADMIN)('Valoración tardía contra PostgreSQL (SBA-43)', ()
       new ReferenciasPrismaRepositorio(prisma, auditoria, idempotencia),
     );
     recepciones = new RecepcionesService(
-      new RecepcionesPrismaRepositorio(prisma, idempotencia, auditoria),
+      new RecepcionesPrismaRepositorio(prisma, idempotencia, auditoria, new OutboxService()),
       donantes,
       new BodegasService(new BodegasPrismaRepositorio(prisma, auditoria)),
       referencias,
     );
-    precios = new PreciosService(new PreciosPrismaRepositorio(prisma, idempotencia, auditoria));
+    precios = new PreciosService(
+      new PreciosPrismaRepositorio(prisma, idempotencia, auditoria, new OutboxService()),
+    );
     ingresos = new IngresosService(new IngresosPrismaRepositorio(prisma));
   });
 
@@ -538,6 +544,133 @@ describe.skipIf(!URL_ADMIN)('Valoración tardía contra PostgreSQL (SBA-43)', ()
 
       expect(recibida.detalles[0]?.valoracion).toBe('con_precio');
       expect(await valoracionesDe(bancoA)).toBe(1);
+    });
+  });
+
+  describe('eventos para analítica (SBA-74, ADR-09)', () => {
+    const contratos = JSON.parse(
+      readFileSync(new URL('../../../docs/eventos/contratos.v1.json', import.meta.url), 'utf8'),
+    ) as { $id: string };
+    const ajv = new Ajv2020();
+    ajv.addSchema(contratos);
+
+    async function eventos(tipo: string) {
+      const filas = await admin.$queryRaw<
+        { tipo: string; version: number; payload: Record<string, unknown> }[]
+      >`
+        SELECT tipo, version, payload FROM core.outbox
+        WHERE banco_id = ${bancoA}::uuid AND tipo = ${tipo} ORDER BY ocurrido_en, id`;
+      for (const evento of filas) {
+        const validar = ajv.getSchema(`${contratos.$id}#/$defs/${evento.tipo}_v1`);
+        expect(validar?.(evento), JSON.stringify(validar?.errors)).toBe(true);
+      }
+      return filas.map((f) => f.payload);
+    }
+
+    it('la recepción emite RecepcionConfirmada con categoría, kilos e importe pendiente en null', async () => {
+      const { donanteId, arroz, aceite } = await datosDelBanco(bancoA);
+      await enBanco(bancoA, () =>
+        precios
+          .proponer({
+            comandoId: uuidv7(),
+            referenciaId: arroz,
+            valor: '2800',
+            piso: '1000',
+            techo: '20000',
+            fuente: 'sipsa',
+            evidencia: 'SIPSA-P Pereira, semana 41',
+            vigenteDesde: '2000-01-01',
+            vigenteHasta: '2999-12-31',
+          })
+          .then(({ precio }) => precios.aprobar({ comandoId: uuidv7(), precioId: precio.id })),
+      );
+      const comando = {
+        comandoId: uuidv7(),
+        donanteId,
+        origen: 'abaco' as const,
+        bodegaId: bodegaDeA,
+        detalles: [
+          { movimientoId: uuidv7(), referenciaId: arroz, cantidad: '4' },
+          { movimientoId: uuidv7(), referenciaId: aceite, cantidad: '2' },
+        ],
+      };
+
+      const { recepcion } = await enBanco(bancoA, () => recepciones.registrar(comando));
+      await enBanco(bancoA, () => recepciones.registrar(comando));
+
+      const [categoria] = await admin.$queryRaw<{ id: string }[]>`
+        SELECT p.categoria_id::text AS id FROM inventario.referencia r
+        JOIN inventario.producto p ON p.banco_id = r.banco_id AND p.id = r.producto_id
+        WHERE r.id = ${arroz}::uuid`;
+      const [deArroz, deAceite] = recepcion.detalles;
+      // Un solo evento: el reenvío devuelve la recepción sin emitir otra vez.
+      expect(await eventos('RecepcionConfirmada')).toEqual([
+        {
+          recepcionId: recepcion.id,
+          bodegaId: bodegaDeA,
+          donanteId,
+          origen: 'abaco',
+          detalles: [
+            {
+              referenciaId: arroz,
+              categoriaId: categoria?.id,
+              loteId: deArroz?.loteId,
+              cantidad: 4,
+              kilos: 2,
+              valorUnitario: '2800.00',
+              importe: '11200.00000',
+            },
+            {
+              referenciaId: aceite,
+              categoriaId: categoria?.id,
+              loteId: deAceite?.loteId,
+              cantidad: 2,
+              kilos: 1.84,
+              valorUnitario: null,
+              importe: null,
+            },
+          ],
+        },
+      ]);
+    });
+
+    it('aprobar emite PrecioActualizado con las entradas que valoró tarde, una sola vez', async () => {
+      const { donanteId, arroz } = await datosDelBanco(bancoA);
+      await recibir(bancoA, donanteId, '2026-10-15T15:00:00Z', [[arroz, '4']]);
+      const [lote] = await admin.$queryRaw<{ id: string }[]>`
+        SELECT id::text FROM inventario.lote WHERE banco_id = ${bancoA}::uuid`;
+      const comando = await enBanco(bancoA, async () => {
+        const { precio } = await precios.proponer({
+          comandoId: uuidv7(),
+          referenciaId: arroz,
+          valor: '2800',
+          piso: '1000',
+          techo: '20000',
+          fuente: 'sipsa',
+          evidencia: 'SIPSA-P Pereira, semana 41',
+          vigenteDesde: '2026-10-01',
+          vigenteHasta: '2026-10-31',
+        });
+        return { comandoId: uuidv7(), precioId: precio.id };
+      });
+
+      await enBanco(bancoA, () => precios.aprobar(comando));
+      await enBanco(bancoA, () => precios.aprobar(comando));
+      // Otro comando sobre el mismo precio falla: su transacción no deja evento.
+      await expect(
+        enBanco(bancoA, () => precios.aprobar({ ...comando, comandoId: uuidv7() })),
+      ).rejects.toThrow(/ya está aprobado/);
+
+      expect(await eventos('PrecioActualizado')).toEqual([
+        {
+          precioId: comando.precioId,
+          referenciaId: arroz,
+          valor: '2800',
+          moneda: 'COP',
+          vigenteDesde: '2026-10-01',
+          valoraciones: [{ loteId: lote?.id, valorUnitario: '2800.00', importe: '11200.00000' }],
+        },
+      ]);
     });
   });
 

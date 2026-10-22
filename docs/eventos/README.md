@@ -18,5 +18,12 @@ marca con `satisfies` y el tipo. Cambiar una carga pide acuerdo del emisor,
 de los consumidores y de arquitectura, y se hace en el esquema y en el tipo a
 la vez.
 
+SBA-74 amplió dos cargas antes de que nadie las consumiera, para que el
+reporte de ingresos de M3 salga de eventos (ADR-09): cada detalle de
+`RecepcionConfirmada` lleva categoría, kilos, valor unitario e importe (`null`
+si la valoración quedó pendiente, ADR-13), y `PrecioActualizado` lleva las
+entradas que valoró tarde y su vigencia como día. El origen va en minúsculas,
+como en la base (`abaco`).
+
 `LoteProximoAVencer`, `TrasladoConfirmado` y las dos alertas de duplicidad
 siguen en borrador hasta que alguien los emita.

@@ -42,8 +42,17 @@ const EVENTOS_TIPADOS: { [T in EventoV1['tipo']]: Extract<EventoV1, { tipo: T }>
       recepcionId: '00000000-0000-4000-8000-000000000001',
       bodegaId: '00000000-0000-4000-8000-000000000002',
       donanteId: '00000000-0000-4000-8000-000000000003',
-      origen: 'ABACO',
-      detalles: [LOTE],
+      origen: 'abaco',
+      detalles: [
+        {
+          ...LOTE,
+          categoriaId: '00000000-0000-4000-8000-000000000015',
+          kilos: 1.25,
+          valorUnitario: '2500.00',
+          importe: '6250.00000',
+        },
+        { ...LOTE, categoriaId: LOTE.referenciaId, kilos: 3, valorUnitario: null, importe: null },
+      ],
     },
   },
   SalidaRegistrada: {
@@ -65,7 +74,8 @@ const EVENTOS_TIPADOS: { [T in EventoV1['tipo']]: Extract<EventoV1, { tipo: T }>
       referenciaId: '00000000-0000-4000-8000-000000000004',
       valor: '2500.5',
       moneda: 'COP',
-      vigenteDesde: '2026-10-12T05:00:00.000Z',
+      vigenteDesde: '2026-10-12',
+      valoraciones: [{ loteId: LOTE.loteId, valorUnitario: '2500.50', importe: '6251.25000' }],
     },
   },
   MembresiaActivada: { tipo: 'MembresiaActivada', version: 1, payload: MEMBRESIA },
@@ -109,7 +119,7 @@ describe('contratos de eventos', () => {
     ajv.addSchema(contratos);
 
     for (const [nombre, contrato] of Object.entries(contratos.$defs)) {
-      if (nombre === 'Uuid' || nombre === 'Cantidad') continue;
+      if (!nombre.endsWith('_v1')) continue;
       const validar = ajv.getSchema(`${contratos.$id}#/$defs/${nombre}`);
       const ejemplo = contrato.examples?.[0];
 

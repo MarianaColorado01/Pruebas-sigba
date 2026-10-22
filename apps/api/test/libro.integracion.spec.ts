@@ -6,6 +6,7 @@ import {
   AuditService,
   executeTransactionWithTenant,
   IdempotenciaService,
+  OutboxService,
   type PrismaService,
   runWithTenantContext,
 } from '../src/core/index.js';
@@ -173,7 +174,12 @@ describe.skipIf(!URL_ADMIN)('Libro de movimientos y saldo contra PostgreSQL (SBA
     );
     donantes = new DonantesService(new DonantesPrismaRepositorio(prisma, auditoria));
     recepciones = new RecepcionesService(
-      new RecepcionesPrismaRepositorio(prisma, new IdempotenciaService(), auditoria),
+      new RecepcionesPrismaRepositorio(
+        prisma,
+        new IdempotenciaService(),
+        auditoria,
+        new OutboxService(),
+      ),
       donantes,
       new BodegasService(new BodegasPrismaRepositorio(prisma, auditoria)),
       catalogo,

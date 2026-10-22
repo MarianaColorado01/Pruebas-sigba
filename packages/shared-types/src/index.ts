@@ -294,6 +294,21 @@ export type DetalleDeEvento = {
   cantidad: number;
 };
 
+/**
+ * Una línea recibida. Sin precio aprobado vigente el día de la recepción,
+ * `valorUnitario` e `importe` van en `null`: valoración pendiente, nunca cero
+ * (ADR-13). Si después se aprueba un precio, llega en `PrecioActualizado`.
+ */
+export type DetalleDeRecepcionConfirmada = DetalleDeEvento & {
+  categoriaId: string;
+  /** Mayor que cero. */
+  kilos: number;
+  /** Decimal en texto. */
+  valorUnitario: string | null;
+  /** Decimal en texto: cantidad por valor unitario. */
+  importe: string | null;
+};
+
 export type RecepcionConfirmadaV1 = {
   tipo: 'RecepcionConfirmada';
   version: 1;
@@ -301,9 +316,9 @@ export type RecepcionConfirmadaV1 = {
     recepcionId: string;
     bodegaId: string;
     donanteId: string;
-    origen: 'propia' | 'ABACO' | 'plataforma';
+    origen: 'propia' | 'abaco' | 'plataforma';
     /** Al menos uno. */
-    detalles: DetalleDeEvento[];
+    detalles: DetalleDeRecepcionConfirmada[];
   };
 };
 
@@ -329,8 +344,13 @@ export type PrecioActualizadoV1 = {
     /** Decimal en texto, con hasta dos decimales: `"2500.00"`. */
     valor: string;
     moneda: 'COP';
-    /** Instante ISO 8601 en UTC. */
+    /** Día `AAAA-MM-DD`, en Colombia. */
     vigenteDesde: string;
+    /**
+     * Entradas pendientes que este precio valoró al aprobarse (valoración
+     * tardía, SBA-43). Vacío si no había ninguna.
+     */
+    valoraciones: { loteId: string; valorUnitario: string; importe: string }[];
   };
 };
 

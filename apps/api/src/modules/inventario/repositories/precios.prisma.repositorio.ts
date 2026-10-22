@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { PrecioActualizadoV1 } from '@sigba/shared-types';
 import {
   AuditService,
   executeTransactionWithTenant,
   IdempotenciaService,
+  OutboxService,
   PrismaService,
 } from '../../../core/index.js';
 import { contexto } from './contexto-de-tenant.js';
@@ -50,6 +52,7 @@ export class PreciosPrismaRepositorio extends PreciosRepositorio {
     private readonly prisma: PrismaService,
     private readonly idempotencia: IdempotenciaService,
     private readonly auditoria: AuditService,
+    private readonly outbox: OutboxService,
   ) {
     super();
   }
@@ -173,14 +176,30 @@ export class PreciosPrismaRepositorio extends PreciosRepositorio {
         // Valoración tardía (SBA-43): las entradas pendientes de la referencia
         // recibidas dentro de la vigencia quedan valoradas con este precio. Va
         // después de aprobar, con la vigencia ya definitiva.
-        await valorarPendientes(tx, this.auditoria, { bancoId, actor }, { precioId });
+        const valoraciones = await valorarPendientes(
+          tx,
+          this.auditoria,
+          { bancoId, actor },
+          { precioId },
+        );
 
-        // PrecioActualizado va aquí, con este mismo `tx`, cuando exista el
-        // outbox (SBA-30). Lleva lo que el reporte de ingresos de M3 necesita
-        // de la valoración tardía; esa carga la acuerdan los capitanes de los
-        // equipos 2 y 3 antes de escribir el consumidor.
+        // Con las entradas que valoró: el reporte de ingresos de M3 pasa su
+        // importe de pendiente a conocido sin leer tablas de inventario.
+        const precio = await leer(tx, precioId);
+        await this.outbox.emitir(tx, {
+          tipo: 'PrecioActualizado',
+          version: 1,
+          payload: {
+            precioId,
+            referenciaId: precio.referenciaId,
+            valor: precio.valor,
+            moneda: 'COP',
+            vigenteDesde: precio.vigenteDesde,
+            valoraciones,
+          },
+        } satisfies PrecioActualizadoV1);
 
-        return { precio: await leer(tx, precioId), repetida: false };
+        return { precio, repetida: false };
       });
     } catch (error) {
       // La exclusión precio_aprobados_sin_cruce: hay un aprobado que empieza

@@ -5,6 +5,13 @@ import { ZONA_DEL_BANCO } from '../services/precios.service.js';
 /** De dónde sale la valoración: un precio que se acaba de aprobar o una recepción nueva. */
 export type ValoracionDe = { precioId: string } | { recepcionId: string };
 
+/** Una entrada que acaba de quedar valorada; decimales en texto. */
+export interface EntradaValorada {
+  loteId: string;
+  valorUnitario: string;
+  importe: string;
+}
+
 /**
  * Valora las entradas pendientes con el precio aprobado que regía el día de la
  * recepción, con el día en Colombia (SBA-43, ADR-13). Escribe una fila en
@@ -22,13 +29,13 @@ export async function valorarPendientes(
   auditoria: AuditService,
   { bancoId, actor }: { bancoId: string; actor: string },
   de: ValoracionDe,
-): Promise<number> {
+): Promise<EntradaValorada[]> {
   const filtro =
     'precioId' in de
       ? Prisma.sql`p.id = ${de.precioId}::uuid`
       : Prisma.sql`r.id = ${de.recepcionId}::uuid AND p.estado = 'aprobado'`;
 
-  const valoraciones = await tx.$queryRaw<{ id: string }[]>`
+  const valoraciones = await tx.$queryRaw<({ id: string } & EntradaValorada)[]>`
     WITH nuevas AS (
       INSERT INTO inventario.valoracion
         (banco_id, movimiento_id, precio_id, valor_unitario, importe, creado_por)
@@ -45,7 +52,7 @@ export async function valorarPendientes(
         AND d.valoracion = 'pendiente'
         AND (r.creado_en AT TIME ZONE ${ZONA_DEL_BANCO})::date
             BETWEEN p.vigente_desde AND coalesce(p.vigente_hasta, 'infinity')
-      RETURNING id, movimiento_id
+      RETURNING id, movimiento_id, valor_unitario, importe
     ), detalles AS (
       UPDATE inventario.recepcion_detalle AS d
       SET valoracion = 'con_precio',
@@ -54,12 +61,21 @@ export async function valorarPendientes(
       FROM nuevas
       WHERE d.banco_id = ${bancoId}::uuid AND d.movimiento_id = nuevas.movimiento_id
     )
-    SELECT id::text FROM nuevas`;
+    SELECT n.id::text, m.lote_id::text AS "loteId",
+           n.valor_unitario::text AS "valorUnitario", n.importe::text AS importe
+    FROM nuevas AS n
+    JOIN inventario.movimiento AS m
+      ON m.banco_id = ${bancoId}::uuid AND m.id = n.movimiento_id
+    ORDER BY m.lote_id`;
 
   for (const { id } of valoraciones) {
     await auditoria.registrar(tx, { accion: 'crear', entidad: 'valoracion', entidadId: id });
   }
-  return valoraciones.length;
+  return valoraciones.map(({ loteId, valorUnitario, importe }) => ({
+    loteId,
+    valorUnitario,
+    importe,
+  }));
 }
 
 /**

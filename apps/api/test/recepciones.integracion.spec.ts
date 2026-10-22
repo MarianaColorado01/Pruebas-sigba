@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   AuditService,
   IdempotenciaService,
+  OutboxService,
   type PrismaService,
   runWithTenantContext,
 } from '../src/core/index.js';
@@ -207,7 +208,12 @@ describe.skipIf(!URL_ADMIN)('Recepción contra PostgreSQL (SBA-24)', () => {
     // PrismaService es un PrismaClient; aquí va uno conectado con el rol de la app.
     const prisma = app as PrismaService;
     const auditoria = new AuditService();
-    repositorio = new RecepcionesPrismaRepositorio(prisma, new IdempotenciaService(), auditoria);
+    repositorio = new RecepcionesPrismaRepositorio(
+      prisma,
+      new IdempotenciaService(),
+      auditoria,
+      new OutboxService(),
+    );
     donantes = new DonantesService(new DonantesPrismaRepositorio(prisma, auditoria));
     referencias = new ReferenciasService(
       new ReferenciasPrismaRepositorio(prisma, auditoria, new IdempotenciaService()),

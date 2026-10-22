@@ -6,6 +6,7 @@ import {
   AuditService,
   executeTransactionWithTenant,
   IdempotenciaService,
+  OutboxService,
   type PrismaService,
   runWithTenantContext,
 } from '../src/core/index.js';
@@ -187,7 +188,12 @@ describe.skipIf(!URL_ADMIN)('Bajas y ajustes contra PostgreSQL (SBA-42)', () => 
     );
     donantes = new DonantesService(new DonantesPrismaRepositorio(prisma, auditoria));
     recepciones = new RecepcionesService(
-      new RecepcionesPrismaRepositorio(prisma, new IdempotenciaService(), auditoria),
+      new RecepcionesPrismaRepositorio(
+        prisma,
+        new IdempotenciaService(),
+        auditoria,
+        new OutboxService(),
+      ),
       donantes,
       bodegas,
       catalogo,

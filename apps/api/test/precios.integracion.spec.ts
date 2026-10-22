@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   AuditService,
   IdempotenciaService,
+  OutboxService,
   type PrismaService,
   runWithTenantContext,
 } from '../src/core/index.js';
@@ -157,7 +158,12 @@ describe.skipIf(!URL_ADMIN)('Maestro de precios contra PostgreSQL (SBA-39)', () 
     const prisma = app as PrismaService;
     const auditoria = new AuditService();
     servicio = new PreciosService(
-      new PreciosPrismaRepositorio(prisma, new IdempotenciaService(), auditoria),
+      new PreciosPrismaRepositorio(
+        prisma,
+        new IdempotenciaService(),
+        auditoria,
+        new OutboxService(),
+      ),
     );
     referencias = new ReferenciasService(
       new ReferenciasPrismaRepositorio(prisma, auditoria, new IdempotenciaService()),
