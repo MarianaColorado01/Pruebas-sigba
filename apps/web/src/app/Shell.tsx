@@ -9,6 +9,7 @@ import {
   DeliveryTruck01Icon,
   SlidersHorizontalIcon,
   UnfoldMoreIcon,
+  UserAdd01Icon,
   UserGroupIcon,
   WarehouseIcon,
 } from '@hugeicons/core-free-icons';
@@ -43,6 +44,12 @@ const DESTINOS: readonly Destino[] = [
     a: '/beneficiarios/instituciones',
     etiqueta: 'Instituciones',
     icono: Building03Icon,
+    roles: ['admin_banco', 'coordinacion'],
+  },
+  {
+    a: '/beneficiarios/registro',
+    etiqueta: 'Registro',
+    icono: UserAdd01Icon,
     roles: ['admin_banco', 'coordinacion'],
   },
   {

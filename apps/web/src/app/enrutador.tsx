@@ -1,4 +1,5 @@
 import { createBrowserRouter, type RouteObject } from 'react-router';
+import { PantallaRegistro } from '@/features/beneficiarios/PantallaRegistro.tsx';
 import { PaginaInvitacion } from '@/features/plataforma/PaginaInvitacion.tsx';
 import { PantallaUsuarios } from '@/features/plataforma/PantallaUsuarios.tsx';
 import { PantallaInstituciones } from '../features/beneficiarios/PantallaInstituciones.tsx';
@@ -51,6 +52,8 @@ export const rutas: RouteObject[] = [
       { path: 'plataforma/auditoria', element: <PantallaDeAuditoria /> },
       // Beneficiarios · directorio de instituciones (SBA-86)
       { path: 'beneficiarios/instituciones', element: <PantallaInstituciones /> },
+      // Beneficiarios · registro nominal (SBA-78)
+      { path: 'beneficiarios/registro', element: <PantallaRegistro /> },
     ],
   },
   // Sin sesión también: `AccesoAuth0` la deja pasar (D2).
