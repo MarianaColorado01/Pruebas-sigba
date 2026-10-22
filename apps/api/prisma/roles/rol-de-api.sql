@@ -139,6 +139,11 @@ GRANT SELECT, INSERT ON beneficiarios.consentimiento TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON beneficiarios.membresia TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON beneficiarios.alerta_duplicidad TO sigba_app;
 
+-- analitica: modelos de lectura que escribe el despachador de eventos (SBA-50).
+-- De un ingreso solo cambia la valoración que llega después (PrecioActualizado).
+GRANT SELECT, INSERT ON analitica.ingreso TO sigba_app;
+GRANT UPDATE (valor_unitario, importe) ON analitica.ingreso TO sigba_app;
+
 -- 4. Funciones SECURITY DEFINER
 -- Cada migración que cree una función SECURITY DEFINER le quita EXECUTE a
 -- PUBLIC y añade aquí su GRANT EXECUTE a sigba_app, en el mismo PR. La

@@ -114,5 +114,20 @@ WHERE publicado_en IS NULL AND intentos >= 10;
 El log de cada fallo lleva consumidor, id y tipo del evento, nunca la carga.
 Para devolverlo a la cola, corrige el consumidor y pon `intentos = 0`.
 
+Si el evento es una `RecepcionConfirmada`, los `PrecioActualizado` que valoran
+sus lotes también terminan en la cola muerta: `analitica.ingresos` los rechaza
+mientras falte la recepción. Devuélvelos a la cola junto con ella, buscándolos
+por lote:
+
+```sql
+UPDATE core.outbox SET intentos = 0, siguiente_intento_en = NULL
+WHERE publicado_en IS NULL AND tipo = 'PrecioActualizado'
+  AND payload -> 'valoraciones' @> ANY (ARRAY(
+    SELECT jsonb_build_array(jsonb_build_object('loteId', d -> 'loteId'))
+    FROM core.outbox AS r, jsonb_array_elements(r.payload -> 'detalles') AS d
+    WHERE r.id = '<id de la RecepcionConfirmada>'
+  ));
+```
+
 `core/` es ruta con CODEOWNER: todo cambio pasa por revisión de arquitectura
 (Arquitectura 5.2).

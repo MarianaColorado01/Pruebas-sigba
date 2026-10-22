@@ -1,4 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Module, type OnModuleInit } from '@nestjs/common';
+import { DespachadorDeEventos } from '../../core/index.js';
+import { IngresosConsumidor } from './events/ingresos.consumidor.js';
+import { IngresosPrismaRepositorio } from './repositories/ingresos.prisma.repositorio.js';
+import { IngresosRepositorio } from './services/ingreso.js';
 
 /**
  * Analitica · Equipo 3
@@ -10,7 +14,19 @@ import { Module } from '@nestjs/common';
 @Module({
   imports: [],
   controllers: [],
-  providers: [],
+  providers: [
+    IngresosConsumidor,
+    { provide: IngresosRepositorio, useClass: IngresosPrismaRepositorio },
+  ],
   exports: [],
 })
-export class AnaliticaModule {}
+export class AnaliticaModule implements OnModuleInit {
+  constructor(
+    private readonly despachador: DespachadorDeEventos,
+    private readonly ingresos: IngresosConsumidor,
+  ) {}
+
+  onModuleInit(): void {
+    this.despachador.suscribir(this.ingresos);
+  }
+}
