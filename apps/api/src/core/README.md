@@ -24,6 +24,14 @@ importa un módulo. El lint lo comprueba y falla si se invierte (ADR-01).
   consumidores.
 - `DespachadorDeEventos` entrega el outbox a los consumidores en proceso: SBA-49. Ver abajo.
 - Puerto `EnviadorDeCorreo` con adaptador SMTP y nulo: SBA-19 (D1).
+- Logs y errores (SBA-83, RNF-M3-08): `registrarPeticiones` escribe una línea por
+  petición con `peticionId`, ruta como patrón, estado, módulo, usuario interno y
+  banco, sin cuerpo, cabeceras ni consulta. `FiltroDeErrores` manda cada 5xx al
+  puerto `ReportadorDeErrores`; el adaptador de Sentry usa su API HTTP, sin SDK.
+  Un error inesperado viaja sin mensaje, solo con su código y la pila, porque el
+  de Prisma puede repetir los datos de la consulta; el de una `HttpException`
+  viaja depurado (`depurar`). La respuesta de un 5xx inesperado solo lleva el
+  `peticionId`, el mismo de la cabecera `X-Request-Id`.
 - Puertos de almacenamiento, visión y precios: SBA-13 y SBA-54.
 
 ## Quién entra a cada ruta

@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { cargarConfiguracionAuth0 } from './auth/auth0-config.js';
 import { Auth0TokenVerifier } from './auth/adapters/auth0/auth0-token-verifier.js';
 import { TOKEN_VERIFIER } from './auth/token-verifier.js';
@@ -22,6 +23,10 @@ import { PrismaService } from './database/prisma.service.js';
 import { IdempotenciaService } from './idempotencia/idempotencia.service.js';
 import { DespachadorDeEventos } from './outbox/despachador.service.js';
 import { OutboxService } from './outbox/outbox.service.js';
+import { crearReportadorDeErrores } from './observabilidad/crear-reportador-de-errores.js';
+import { FiltroDeErrores } from './observabilidad/filtro-de-errores.js';
+import { ModuloDeLaRutaInterceptor } from './observabilidad/modulo-de-la-ruta.interceptor.js';
+import { ReportadorDeErrores } from './observabilidad/reportador-de-errores.js';
 
 @Global()
 @Module({
@@ -36,6 +41,9 @@ import { OutboxService } from './outbox/outbox.service.js';
       provide: TOKEN_VERIFIER,
       useFactory: () => new Auth0TokenVerifier(cargarConfiguracionAuth0()),
     },
+    { provide: ReportadorDeErrores, useFactory: () => crearReportadorDeErrores() },
+    { provide: APP_FILTER, useClass: FiltroDeErrores },
+    { provide: APP_INTERCEPTOR, useClass: ModuloDeLaRutaInterceptor },
   ],
   exports: [
     PrismaService,

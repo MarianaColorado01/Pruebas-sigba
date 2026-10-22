@@ -33,3 +33,5 @@ export type {
   EventoEntregado,
   TransaccionDeEvento,
 } from './outbox/consumidor-de-eventos.js';
+
+export { registrarPeticiones } from './observabilidad/registrar-peticiones.js';

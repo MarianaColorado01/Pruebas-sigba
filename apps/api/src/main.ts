@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { ConsoleLogger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import { DespachadorDeEventos } from './core/index.js';
@@ -15,7 +16,9 @@ if (!process.env['API_DATABASE_URL']) {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // En producción, una línea JSON por evento para el log de Fly.io (RNF-M3-08).
+  const json = process.env['NODE_ENV'] === 'production';
+  const app = await NestFactory.create(AppModule, { logger: new ConsoleLogger({ json }) });
   configurarApp(app);
   await app.listen(process.env['PORT'] ?? 3000, '0.0.0.0');
   app.get(DespachadorDeEventos).iniciar();

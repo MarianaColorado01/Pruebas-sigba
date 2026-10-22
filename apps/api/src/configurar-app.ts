@@ -1,4 +1,5 @@
 import { type INestApplication, ValidationPipe } from '@nestjs/common';
+import { registrarPeticiones } from './core/index.js';
 import { corsOrigins } from './cors.js';
 
 /**
@@ -8,7 +9,10 @@ import { corsOrigins } from './cors.js';
 export function configurarApp(app: INestApplication, origenes = corsOrigins()): void {
   // La PWA lee el ETag del catálogo desde otro origen (ADR-02): sin exponerlo,
   // el navegador lo oculta y la caché nunca sabe si cambió.
-  app.enableCors({ origin: origenes, exposedHeaders: ['ETag'] });
+  // X-Request-Id es el identificador que la PWA muestra para buscar un error
+  // en el log y en Sentry (RNF-M3-08).
+  app.enableCors({ origin: origenes, exposedHeaders: ['ETag', 'X-Request-Id'] });
+  app.use(registrarPeticiones());
 
   // Toda la API cuelga de /api/v1 y la PWA se despliega aparte (ADR-02).
   app.setGlobalPrefix('api/v1');
