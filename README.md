@@ -59,6 +59,7 @@ El flujo de trabajo, el formato de rama y la definición de terminado están en
 | Cronograma                 | [`docs/03_Cronograma_SIGBA.pdf`](docs/03_Cronograma_SIGBA.pdf)                 |
 | Presupuesto                | [`docs/04_Presupuesto_SIGBA.pdf`](docs/04_Presupuesto_SIGBA.pdf)               |
 | Registros de decisión      | [`docs/adr/`](docs/adr/)                                                       |
+| Operación                  | [`docs/operacion/`](docs/operacion/README.md)                                  |
 
 ## Equipos
 
