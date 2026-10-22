@@ -8,6 +8,12 @@ import { configurarApp } from './configurar-app.js';
 const archivoEnv = fileURLToPath(new URL('../../../.env', import.meta.url));
 if (existsSync(archivoEnv)) process.loadEnvFile(archivoEnv);
 
+// Sin la URL de sigba_app, PrismaService no conecta y la sonda de Fly.io
+// respondería OK con la API sin base de datos.
+if (!process.env['API_DATABASE_URL']) {
+  throw new Error('Configura API_DATABASE_URL con las credenciales del rol sigba_app.');
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   configurarApp(app);

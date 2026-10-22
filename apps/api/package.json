@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "license": "UNLICENSED",
+  "files": [
+    "dist",
+    "prisma"
+  ],
   "scripts": {
     "build": "prisma generate && nest build",
     "db:roles": "prisma db execute --schema prisma/schema.prisma --file prisma/roles/rol-de-api.sql",

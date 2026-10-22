@@ -2,6 +2,7 @@
 
 - **Estado:** aceptado
 - **Fecha:** 10 de septiembre de 2026
+- **Enmienda:** 22 de octubre de 2026, PWA en un Worker de Cloudflare (al final)
 - **Fuente:** Documento de Arquitectura v1.2, anexo A
 
 ## Contexto
@@ -31,3 +32,14 @@ URLs.
 
 Verificar regiones, cuotas y restauración con el presupuesto de seis meses y
 cuentas institucionales. El soporte posterior sigue abierto.
+
+## Enmienda · 22 de octubre de 2026
+
+La PWA se publica como Worker de Cloudflare con assets estáticos, no en Pages.
+Cloudflare va a retirar Pages y la CLI `cf` ya no publica allí. El Worker no
+tiene código: sirve el build de Vite y responde `index.html` en las rutas del
+router. Lo publica `.github/workflows/despliegue.yml` con
+`cf deploy --prebuilt` (SBA-7). Aprobó Camilo Agudelo como responsable de
+arquitectura.
+
+El resto de la decisión no cambia: Fly.io, Neon y R2 siguen igual.

@@ -27,3 +27,6 @@ Thumbs.db
 
 # Trabajo temporal
 tmp/
+
+# Build Output de `cf deploy`
+.cloudflare/

@@ -1,0 +1,142 @@
+name: Despliegue a staging
+
+# Cada push a main que pasa CI actualiza staging sin intervención (SBA-7).
+# Mientras falten los secretos del entorno `staging`, el workflow lo dice en el
+# resumen y termina en verde: no bloquea a nadie antes de que existan las
+# cuentas.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Dos despliegues nunca corren a la vez, y uno en curso no se cancela a medias.
+concurrency:
+  group: despliegue-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  configuracion:
+    name: configuracion
+    runs-on: ubuntu-latest
+    # A mano solo se despliega main: staging nunca recibe una rama sin revisar.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push')
+    environment: staging
+    outputs:
+      api: ${{ steps.revisar.outputs.api }}
+      web: ${{ steps.revisar.outputs.web }}
+    steps:
+      - name: Revisar secretos del entorno staging
+        id: revisar
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          api=false
+          web=false
+          if [[ -n "$FLY_API_TOKEN" && -n "$DATABASE_URL" ]]; then
+            api=true
+          else
+            echo "::notice::API sin desplegar: faltan FLY_API_TOKEN o STAGING_DATABASE_URL en el entorno staging."
+          fi
+          if [[ -n "$CLOUDFLARE_API_TOKEN" && -n "$CLOUDFLARE_ACCOUNT_ID" && -n "$VITE_API_URL" ]]; then
+            web=true
+          else
+            echo "::notice::PWA sin desplegar: faltan CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID o VITE_API_URL en el entorno staging."
+          fi
+          echo "api=$api" >> "$GITHUB_OUTPUT"
+          echo "web=$web" >> "$GITHUB_OUTPUT"
+
+  api:
+    name: api
+    needs: configuracion
+    if: needs.configuracion.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    # Cada secreto entra solo al paso que lo usa: ni `pnpm install` ni las
+    # acciones de terceros los ven. La URL del dueño de las tablas no llega a
+    # Fly.io: la API se conecta como sigba_app (Arquitectura 8.1,
+    # docs/arquitectura/rol-de-api.md).
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter @sigba/api...
+      # Migraciones antes de la imagen nueva: la versión que sigue en pie tiene
+      # que tolerar el esquema nuevo, así que cada migración solo agrega.
+      - name: migraciones
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: pnpm --filter @sigba/api exec prisma migrate deploy
+      - name: rol de la API
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: pnpm --filter @sigba/api run db:roles
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+      - name: desplegar en Fly.io
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy . --config apps/api/fly.toml --dockerfile apps/api/Dockerfile --remote-only
+      - name: health
+        run: curl -fsS --retry 5 --retry-all-errors https://sigba-api-staging.fly.dev/api/v1/health
+
+  # La PWA se sirve como Worker de solo assets: Cloudflare va a retirar Pages, y
+  # la CLI `cf` ya no publica en Pages. `cf deploy --prebuilt` sube `dist/` tal
+  # cual, sin wrangler ni plugin de Vite.
+  web:
+    name: web
+    needs: configuracion
+    if: needs.configuracion.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter @sigba/web...
+      # Valores públicos: terminan dentro del JavaScript que descarga el navegador.
+      - name: build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_AUTH0_DOMAIN: ${{ vars.VITE_AUTH0_DOMAIN }}
+          VITE_AUTH0_CLIENT_ID: ${{ vars.VITE_AUTH0_CLIENT_ID }}
+          VITE_AUTH0_AUDIENCE: ${{ vars.VITE_AUTH0_AUDIENCE }}
+        run: pnpm --filter @sigba/web... run build
+      # Build Output v0 de `cf`: un Worker sin código que sirve `dist/` y
+      # responde index.html en las rutas del router de la PWA.
+      - name: desplegar en Cloudflare
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CF_QUIET: 1
+        run: |
+          set -euo pipefail
+          salida=.cloudflare/output/v0
+          rm -rf .cloudflare
+          mkdir -p "$salida/workers/default"
+          cp -r dist "$salida/workers/default/assets"
+          echo '{"buildContext":{"isPreview":false}}' > "$salida/config.json"
+          echo '{"name":"sigba-web-staging","compatibilityDate":"2026-10-06","assets":{"notFoundHandling":"single-page-application"}}' \
+            > "$salida/workers/default/worker.config.json"
+          pnpm dlx cf@1.0.0-beta.20 deploy --prebuilt
