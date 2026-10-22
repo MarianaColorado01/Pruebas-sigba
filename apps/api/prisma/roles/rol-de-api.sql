@@ -94,6 +94,9 @@ GRANT SELECT ON core.comando_procesado TO sigba_app;
 -- core: outbox se escribe por su función con banco del contexto de transacción.
 GRANT SELECT ON core.outbox TO sigba_app;
 
+-- core: evento_consumido se escribe solo con core.reclamar_entrega (SBA-49).
+GRANT SELECT ON core.evento_consumido TO sigba_app;
+
 -- inventario
 GRANT SELECT, INSERT, UPDATE ON inventario.categoria TO sigba_app;
 GRANT SELECT, INSERT, UPDATE ON inventario.producto TO sigba_app;
@@ -141,6 +144,12 @@ GRANT EXECUTE ON FUNCTION core.reclamar_comando(uuid, smallint, text, text, uuid
 
 -- Outbox transaccional (SBA-30).
 GRANT EXECUTE ON FUNCTION core.emitir_evento(text, smallint, jsonb) TO sigba_app;
+
+-- Despachador del outbox (SBA-49).
+GRANT EXECUTE ON FUNCTION core.reclamar_eventos(text[], integer, integer, integer) TO sigba_app;
+GRANT EXECUTE ON FUNCTION core.reclamar_entrega(uuid, text) TO sigba_app;
+GRANT EXECUTE ON FUNCTION core.publicar_evento(uuid) TO sigba_app;
+GRANT EXECUTE ON FUNCTION core.posponer_evento(uuid, integer) TO sigba_app;
 
 -- Comprobación de super_admin en las políticas de banco (SBA-19).
 GRANT EXECUTE ON FUNCTION plataforma.actua_como_super_admin() TO sigba_app;

@@ -20,6 +20,7 @@ import { crearEnviadorDeCorreo } from './correo/crear-enviador-de-correo.js';
 import { EnviadorDeCorreo } from './correo/enviador-de-correo.js';
 import { PrismaService } from './database/prisma.service.js';
 import { IdempotenciaService } from './idempotencia/idempotencia.service.js';
+import { DespachadorDeEventos } from './outbox/despachador.service.js';
 import { OutboxService } from './outbox/outbox.service.js';
 
 @Global()
@@ -29,6 +30,7 @@ import { OutboxService } from './outbox/outbox.service.js';
     AuditService,
     IdempotenciaService,
     OutboxService,
+    DespachadorDeEventos,
     { provide: EnviadorDeCorreo, useFactory: () => crearEnviadorDeCorreo() },
     {
       provide: TOKEN_VERIFIER,
@@ -40,6 +42,7 @@ import { OutboxService } from './outbox/outbox.service.js';
     AuditService,
     IdempotenciaService,
     OutboxService,
+    DespachadorDeEventos,
     EnviadorDeCorreo,
     TOKEN_VERIFIER,
   ],

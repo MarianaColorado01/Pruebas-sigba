@@ -27,3 +27,9 @@ export {
   type ResultadoDeComando,
 } from './idempotencia/idempotencia.service.js';
 export { OutboxService, type EventoDeDominio } from './outbox/outbox.service.js';
+export { DespachadorDeEventos } from './outbox/despachador.service.js';
+export type {
+  ConsumidorDeEventos,
+  EventoEntregado,
+  TransaccionDeEvento,
+} from './outbox/consumidor-de-eventos.js';
