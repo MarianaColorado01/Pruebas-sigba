@@ -7,11 +7,20 @@
  * aquí; lo pone el adaptador desde el contexto de tenant, igual que RLS.
  */
 
-/**
- * Lo que se sabe del lote con su fecha. El semáforo con umbrales por banco es
- * SBA-37; aquí solo lo que la fecha dice por sí sola.
- */
+/** Lo que la fecha del lote dice por sí sola. */
 export type EstadoDelLote = 'vencido' | 'vigente' | 'sin_vencimiento';
+
+/**
+ * Prioridad de salida de un lote vigente según los umbrales del banco
+ * (SBA-37, RF-M1-08): rojo sale hoy, amarillo esta semana.
+ */
+export type Semaforo = 'rojo' | 'amarillo' | 'verde';
+
+/** Los parámetros `semaforo_rojo_dias` y `semaforo_amarillo_dias`; nulo si el banco no lo fijó. */
+export interface UmbralesDelSemaforo {
+  rojo: number | null;
+  amarillo: number | null;
+}
 
 export interface FiltroDeStock {
   bodegaId?: string;
@@ -40,6 +49,10 @@ export interface SaldoDeLote {
 
 export interface LoteEnStock extends SaldoDeLote {
   estado: EstadoDelLote;
+  /** Días de hoy al vencimiento: 0 vence hoy, negativo ya venció. Nulo sin fecha. */
+  diasParaVencer: number | null;
+  /** Nulo si el lote venció, no trae fecha o el banco no tiene umbrales. */
+  semaforo: Semaforo | null;
 }
 
 export abstract class StockRepositorio {

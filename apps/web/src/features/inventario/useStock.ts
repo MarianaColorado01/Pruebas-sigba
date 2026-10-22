@@ -85,18 +85,23 @@ export function useStock() {
 function aPantalla({ lotes, obtenidoEn }: StockGuardado, desactualizado: boolean): StockEnPantalla {
   if (!desactualizado) return { lotes, obtenidoEn, desactualizado };
   // La copia trae el estado del día en que se leyó: un lote que venció desde
-  // entonces se ve vencido aunque no haya red.
+  // entonces se ve vencido aunque no haya red. Los días se recalculan; el
+  // semáforo queda el último conocido, porque los umbrales viven en la API.
   const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
   return {
-    lotes: lotes.map((lote) => ({
-      ...lote,
-      estado:
-        lote.vencimiento === null
-          ? 'sin_vencimiento'
-          : lote.vencimiento < hoy
-            ? 'vencido'
-            : 'vigente',
-    })),
+    lotes: lotes.map((lote) => {
+      if (lote.vencimiento === null) {
+        return { ...lote, estado: 'sin_vencimiento', diasParaVencer: null, semaforo: null };
+      }
+      const dias = Math.round((Date.parse(lote.vencimiento) - Date.parse(hoy)) / 86_400_000);
+      return {
+        ...lote,
+        estado: dias < 0 ? 'vencido' : 'vigente',
+        diasParaVencer: dias,
+        // Una copia anterior a SBA-37 no trae semáforo.
+        semaforo: dias < 0 ? null : (lote.semaforo ?? null),
+      };
+    }),
     obtenidoEn,
     desactualizado,
   };

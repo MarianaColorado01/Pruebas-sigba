@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { stockDb } from '@/offline/stockDb.ts';
@@ -39,6 +39,8 @@ function lote(datos: Partial<LoteEnStock> & Pick<LoteEnStock, 'loteId'>): LoteEn
     codigo: null,
     vencimiento: '2027-03-31',
     estado: 'vigente',
+    diasParaVencer: 160,
+    semaforo: 'verde',
     cantidad: '10',
     kilos: '10',
     referencia: arroz,
@@ -52,6 +54,8 @@ const lotes: LoteEnStock[] = [
     codigo: 'L-1',
     vencimiento: '2026-09-30',
     estado: 'vencido',
+    diasParaVencer: -21,
+    semaforo: null,
     cantidad: '4',
     kilos: '4',
   }),
@@ -61,6 +65,8 @@ const lotes: LoteEnStock[] = [
     referencia: frijol,
     vencimiento: null,
     estado: 'sin_vencimiento',
+    diasParaVencer: null,
+    semaforo: null,
     cantidad: '8',
     kilos: '4',
   }),
@@ -132,7 +138,14 @@ describe('stock por bodega (SBA-36)', () => {
   });
 
   it('sin red, un lote que venció después de guardar la copia se ve vencido', async () => {
-    const copia = [lote({ loteId: 'lote-viejo', vencimiento: '2020-01-31', estado: 'vigente' })];
+    const copia = [
+      lote({
+        loteId: 'lote-viejo',
+        vencimiento: '2020-01-31',
+        estado: 'vigente',
+        semaforo: 'rojo',
+      }),
+    ];
     vi.mocked(stockDb.leer).mockResolvedValue({
       bancoId: BANCO,
       lotes: copia,
@@ -143,6 +156,7 @@ describe('stock por bodega (SBA-36)', () => {
     render(<StockPage />, { wrapper });
 
     expect(await screen.findByText('Vence 31/01/2020 · Vencido')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Sale hoy' })).toBeNull();
   });
 
   it('si la API responde con error, la copia en pantalla se avisa como desactualizada', async () => {
@@ -165,6 +179,44 @@ describe('stock por bodega (SBA-36)', () => {
 
     await screen.findByRole('alert');
     expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
+  });
+
+  it('lista primero lo que sale hoy, luego esta semana y este mes, sin vencidos (SBA-37)', async () => {
+    const enSemaforo = [
+      ...lotes,
+      lote({ loteId: 'mes', codigo: 'L-MES', diasParaVencer: 20, semaforo: 'verde' }),
+      lote({ loteId: 'semana', codigo: 'L-SEM', diasParaVencer: 6, semaforo: 'amarillo' }),
+      lote({ loteId: 'hoy-2', codigo: 'L-H2', diasParaVencer: 2, semaforo: 'rojo' }),
+      lote({ loteId: 'hoy-0', codigo: 'L-H0', diasParaVencer: 0, semaforo: 'rojo' }),
+    ];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respuesta(enSemaforo)));
+    const { wrapper } = preparar();
+    render(<StockPage />, { wrapper });
+
+    const seccion = await screen.findByRole('region', { name: 'Salida prioritaria' });
+    const titulos = within(seccion)
+      .getAllByRole('heading', { level: 3 })
+      .map((titulo) => titulo.textContent);
+    expect(titulos).toEqual(['Sale hoy', 'Sale esta semana', 'Sale este mes']);
+    const filas = within(seccion)
+      .getAllByRole('listitem')
+      .map((fila) => fila.textContent);
+    expect(filas).toEqual([
+      'Arroz 1 kg · Lote L-H0Vence hoy · Bodega cccccccc · 10 unidades',
+      'Arroz 1 kg · Lote L-H2Vence en 2 días · Bodega cccccccc · 10 unidades',
+      'Arroz 1 kg · Lote L-SEMVence en 6 días · Bodega cccccccc · 10 unidades',
+      'Arroz 1 kg · Lote L-MESVence en 20 días · Bodega cccccccc · 10 unidades',
+    ]);
+    expect(screen.getAllByText(/· Vigente · Rojo$/)).toHaveLength(2);
+  });
+
+  it('sin umbrales en el banco lo dice en vez de dejar la lista vacía', async () => {
+    const sinSemaforo = lotes.map((l) => ({ ...l, semaforo: null }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(respuesta(sinSemaforo)));
+    const { wrapper } = preparar();
+    render(<StockPage />, { wrapper });
+
+    expect(await screen.findByText(/El banco no tiene umbrales de semáforo/)).toBeTruthy();
   });
 
   it('filtra por bodega, categoría y referencia sin volver a consultar', async () => {

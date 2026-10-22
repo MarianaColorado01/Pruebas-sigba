@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AuditService,
   executeTransactionWithTenant,
@@ -19,6 +19,8 @@ import { ReferenciasService } from '../src/modules/inventario/services/referenci
 import { StockService } from '../src/modules/inventario/services/stock.service.js';
 import { BodegasPrismaRepositorio } from '../src/modules/plataforma/repositories/bodegas.prisma.repositorio.js';
 import { BodegasService } from '../src/modules/plataforma/services/bodegas.service.js';
+import { ParametrosPrismaRepositorio } from '../src/modules/plataforma/repositories/parametros.prisma.repositorio.js';
+import { ParametrosService } from '../src/modules/plataforma/services/parametros.service.js';
 import { urlComoRolApp } from './rol-de-aplicacion.js';
 
 /**
@@ -53,6 +55,7 @@ describe.skipIf(!URL_ADMIN)(
     let donantes: DonantesService;
     let catalogo: ReferenciasService;
     let stock: StockService;
+    let parametros: ParametrosService;
 
     const bancoA = 'aaaaaaaa-3636-4363-8363-aaaaaaaaaaaa';
     const bancoB = 'bbbbbbbb-3636-4363-8363-bbbbbbbbbbbb';
@@ -138,6 +141,7 @@ describe.skipIf(!URL_ADMIN)(
           admin.$executeRawUnsafe(`DELETE FROM inventario.${tabla} WHERE ${enBancos}`),
         ),
         admin.$executeRawUnsafe(`DELETE FROM core.comando_procesado WHERE ${enBancos}`),
+        admin.$executeRawUnsafe(`DELETE FROM plataforma.parametro_banco WHERE ${enBancos}`),
       ]);
     }
 
@@ -174,7 +178,8 @@ describe.skipIf(!URL_ADMIN)(
         new BodegasService(new BodegasPrismaRepositorio(prisma, auditoria)),
         catalogo,
       );
-      stock = new StockService(new StockPrismaRepositorio(prisma));
+      parametros = new ParametrosService(new ParametrosPrismaRepositorio(prisma, auditoria));
+      stock = new StockService(new StockPrismaRepositorio(prisma), parametros);
     });
 
     beforeEach(async () => {
@@ -270,6 +275,53 @@ describe.skipIf(!URL_ADMIN)(
         producto: { nombre: 'Arroz' },
         categoria: { codigo: 'C801', nombre: 'Arroz' },
       });
+    });
+
+    it('pinta el semáforo con los umbrales vigentes del banco y refleja un cambio sin desplegar (SBA-37)', async () => {
+      const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(
+        new Date(),
+      );
+      const enDias = (dias: number) =>
+        new Date(Date.parse(hoy) + dias * 86_400_000).toISOString().slice(0, 10);
+      await recibir(arroz, 1, { vencimiento: enDias(3), lote: 'EN-3' });
+      await recibir(arroz, 1, { vencimiento: enDias(6), lote: 'EN-6' });
+      await recibir(arroz, 1, { vencimiento: enDias(30), lote: 'EN-30' });
+      const luces = async () =>
+        (await enBanco(bancoA, () => stock.consultar())).map((l) => [
+          l.codigo,
+          l.diasParaVencer,
+          l.semaforo,
+        ]);
+
+      expect(await luces()).toEqual([
+        ['EN-3', 3, null],
+        ['EN-6', 6, null],
+        ['EN-30', 30, null],
+      ]);
+
+      await enBanco(bancoA, async () => {
+        await parametros.actualizar('semaforo_rojo_dias', 3);
+        await parametros.actualizar('semaforo_amarillo_dias', 7);
+      });
+      expect(await luces()).toEqual([
+        ['EN-3', 3, 'rojo'],
+        ['EN-6', 6, 'amarillo'],
+        ['EN-30', 30, 'verde'],
+      ]);
+
+      // Una vigencia empezada no se edita: el cambio entra mañana, y mañana se ve.
+      await enBanco(bancoA, () => parametros.actualizar('semaforo_rojo_dias', 1, enDias(1)));
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(Date.now() + 86_400_000));
+      try {
+        expect(await luces()).toEqual([
+          ['EN-3', 2, 'amarillo'],
+          ['EN-6', 5, 'amarillo'],
+          ['EN-30', 29, 'verde'],
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('un lote que quedó en cero no aparece como disponible', async () => {

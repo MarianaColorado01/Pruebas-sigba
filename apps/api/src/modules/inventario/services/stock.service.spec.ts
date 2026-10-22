@@ -1,6 +1,8 @@
+import type { ClaveParametro, ParametroListado, ParametroVigente } from '@sigba/shared-types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ParametrosLectura } from '../../plataforma/index.js';
 import { type FiltroDeStock, type SaldoDeLote, StockRepositorio } from './stock.js';
-import { estadoDelLote, StockService } from './stock.service.js';
+import { estadoDelLote, semaforoDelLote, StockService } from './stock.service.js';
 
 /** Devuelve los saldos que se le den y guarda el filtro con que lo llamaron. */
 class StockEnMemoria extends StockRepositorio {
@@ -10,6 +12,31 @@ class StockEnMemoria extends StockRepositorio {
   async saldos(filtro: FiltroDeStock): Promise<SaldoDeLote[]> {
     this.filtros.push(filtro);
     return this.filas;
+  }
+}
+
+/** Los parámetros vigentes del banco, con la fecha con que se consultaron. */
+class ParametrosEnMemoria extends ParametrosLectura {
+  valores: Partial<Record<ClaveParametro, number>> = {};
+  fechas: (string | undefined)[] = [];
+
+  async obtenerVigente<K extends ClaveParametro>(
+    clave: K,
+    fecha?: string,
+  ): Promise<ParametroVigente<K> | null> {
+    this.fechas.push(fecha);
+    const valor = this.valores[clave];
+    if (valor === undefined) return null;
+    return {
+      valor,
+      version: 1,
+      fecha_inicio: '2026-01-01',
+      fecha_fin: null,
+    } as ParametroVigente<K>;
+  }
+
+  async listarVigentes(): Promise<ParametroListado[]> {
+    return [];
   }
 }
 
@@ -32,11 +59,13 @@ function saldo(vencimiento: string | null): SaldoDeLote {
 
 describe('StockService', () => {
   let repositorio: StockEnMemoria;
+  let parametros: ParametrosEnMemoria;
   let servicio: StockService;
 
   beforeEach(() => {
     repositorio = new StockEnMemoria();
-    servicio = new StockService(repositorio);
+    parametros = new ParametrosEnMemoria();
+    servicio = new StockService(repositorio, parametros);
   });
 
   afterEach(() => {
@@ -81,6 +110,62 @@ describe('StockService', () => {
     const [lote] = await servicio.consultar();
 
     expect(lote?.estado).toBe('vigente');
+  });
+
+  it('pinta el semáforo con los umbrales del banco vigentes hoy en Colombia', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-16T02:00:00Z'));
+    parametros.valores = { semaforo_rojo_dias: 3, semaforo_amarillo_dias: 7 };
+    repositorio.filas = [
+      saldo('2026-10-14'),
+      saldo('2026-10-18'),
+      saldo('2026-10-19'),
+      saldo('2026-10-22'),
+      saldo('2026-10-23'),
+      saldo(null),
+    ];
+
+    const lotes = await servicio.consultar();
+
+    expect(lotes.map(({ diasParaVencer, semaforo }) => [diasParaVencer, semaforo])).toEqual([
+      [-1, null],
+      [3, 'rojo'],
+      [4, 'amarillo'],
+      [7, 'amarillo'],
+      [8, 'verde'],
+      [null, null],
+    ]);
+    expect(parametros.fechas).toEqual(['2026-10-15', '2026-10-15']);
+  });
+
+  it('sin umbrales configurados no hay semáforo, pero sí los días', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-15T15:00:00Z'));
+    repositorio.filas = [saldo('2026-10-16')];
+
+    const [lote] = await servicio.consultar();
+
+    expect(lote).toMatchObject({ diasParaVencer: 1, semaforo: null, estado: 'vigente' });
+  });
+});
+
+describe('semaforoDelLote', () => {
+  it('el día del umbral ya cuenta: con rojo en 3, el lote a 3 días está en rojo', () => {
+    expect(semaforoDelLote(3, { rojo: 3, amarillo: 7 })).toBe('rojo');
+    expect(semaforoDelLote(0, { rojo: 3, amarillo: 7 })).toBe('rojo');
+    expect(semaforoDelLote(7, { rojo: 3, amarillo: 7 })).toBe('amarillo');
+    expect(semaforoDelLote(8, { rojo: 3, amarillo: 7 })).toBe('verde');
+  });
+
+  it('con un solo umbral aplica ese', () => {
+    expect(semaforoDelLote(2, { rojo: 3, amarillo: null })).toBe('rojo');
+    expect(semaforoDelLote(4, { rojo: 3, amarillo: null })).toBe('verde');
+    expect(semaforoDelLote(2, { rojo: null, amarillo: 7 })).toBe('amarillo');
+  });
+
+  it('un lote vencido o sin fecha no lleva semáforo', () => {
+    expect(semaforoDelLote(-1, { rojo: 3, amarillo: 7 })).toBeNull();
+    expect(semaforoDelLote(null, { rojo: 3, amarillo: 7 })).toBeNull();
   });
 });
 

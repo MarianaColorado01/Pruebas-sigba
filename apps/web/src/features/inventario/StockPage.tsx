@@ -10,6 +10,27 @@ const ESTADOS: Record<LoteEnStock['estado'], string> = {
   sin_vencimiento: 'Sin vencimiento',
 };
 
+type Semaforo = NonNullable<LoteEnStock['semaforo']>;
+
+const SEMAFOROS: Record<Semaforo, { nombre: string; color: string }> = {
+  rojo: { nombre: 'Rojo', color: 'bg-red-600' },
+  amarillo: { nombre: 'Amarillo', color: 'bg-yellow-400' },
+  verde: { nombre: 'Verde', color: 'bg-green-600' },
+};
+
+/** «Este mes» son los próximos 30 días; rojo y amarillo los fija el banco. */
+const DIAS_DEL_MES = 30;
+
+const LISTAS_DE_SALIDA: { titulo: string; incluye: (lote: LoteEnStock) => boolean }[] = [
+  { titulo: 'Sale hoy', incluye: (lote) => lote.semaforo === 'rojo' },
+  { titulo: 'Sale esta semana', incluye: (lote) => lote.semaforo === 'amarillo' },
+  {
+    titulo: 'Sale este mes',
+    incluye: (lote) =>
+      lote.semaforo === 'verde' && (lote.diasParaVencer ?? Infinity) <= DIAS_DEL_MES,
+  },
+];
+
 const HORA = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
 const NUMERO = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 3 });
 
@@ -37,6 +58,16 @@ export function StockPage() {
       (!referenciaId || lote.referencia.id === referenciaId),
   );
   const grupos = agruparPorReferencia(visibles);
+  // Primero lo que vence primero (FEFO), sin importar la bodega.
+  const porVencimiento = visibles
+    .filter((lote) => lote.semaforo !== null)
+    .toSorted((a, b) => (a.diasParaVencer ?? 0) - (b.diasParaVencer ?? 0));
+  const listas = LISTAS_DE_SALIDA.map((lista) => ({
+    ...lista,
+    lotes: porVencimiento.filter(lista.incluye),
+  })).filter((lista) => lista.lotes.length > 0);
+  const sinUmbrales =
+    porVencimiento.length === 0 && visibles.some((lote) => lote.estado === 'vigente');
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col gap-5 p-4 sm:p-6">
@@ -113,6 +144,47 @@ export function StockPage() {
 
       {stock.data && grupos.length === 0 && <p>No hay stock disponible con esos filtros.</p>}
 
+      {grupos.length > 0 && (
+        <section aria-labelledby="salida-prioritaria" className="flex flex-col gap-3">
+          <h2 id="salida-prioritaria" className="text-lg font-semibold">
+            Salida prioritaria
+          </h2>
+          {sinUmbrales ? (
+            <p className="text-sm text-muted-foreground">
+              El banco no tiene umbrales de semáforo. La administración del banco los fija en
+              Parámetros.
+            </p>
+          ) : listas.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Ningún lote vence en los próximos 30 días.
+            </p>
+          ) : (
+            listas.map(({ titulo, lotes: deLaLista }) => (
+              <div key={titulo} className="flex flex-col gap-2">
+                <h3 className="font-medium">{titulo}</h3>
+                <ul className="flex flex-col gap-2">
+                  {deLaLista.map((lote) => (
+                    <li
+                      key={`${lote.bodegaId}/${lote.loteId}`}
+                      className="flex flex-col gap-1 rounded-md border border-input p-3"
+                    >
+                      <span className="font-medium">
+                        {lote.referencia.producto.nombre} {lote.referencia.presentacion} ·{' '}
+                        {lote.codigo ? `Lote ${lote.codigo}` : 'Lote sin código'}
+                      </span>
+                      <span>
+                        {faltan(lote.diasParaVencer ?? 0)} · {nombreDeBodega(lote.bodegaId)} ·{' '}
+                        {cantidad(Number(lote.cantidad))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          )}
+        </section>
+      )}
+
       <div className="flex flex-col gap-5">
         {grupos.map(({ referencia, lotes: delGrupo }) => (
           <section key={referencia.id} aria-labelledby={`stock-${referencia.id}`}>
@@ -134,9 +206,16 @@ export function StockPage() {
                     {lote.codigo ? `Lote ${lote.codigo}` : 'Lote sin código'} ·{' '}
                     {nombreDeBodega(lote.bodegaId)}
                   </span>
-                  <span>
+                  <span className="flex items-center gap-2">
+                    {lote.semaforo && (
+                      <span
+                        aria-hidden="true"
+                        className={`size-3 rounded-full ${SEMAFOROS[lote.semaforo].color}`}
+                      />
+                    )}
                     {lote.vencimiento ? `Vence ${fecha(lote.vencimiento)}` : 'Sin fecha'} ·{' '}
                     {ESTADOS[lote.estado]}
+                    {lote.semaforo && ` · ${SEMAFOROS[lote.semaforo].nombre}`}
                   </span>
                   <span>
                     {cantidad(Number(lote.cantidad))} · {NUMERO.format(Number(lote.kilos))} kg
@@ -163,6 +242,12 @@ function nombreDeBodega(id: string): string {
 function fecha(vencimiento: string): string {
   const [anio, mes, dia] = vencimiento.split('-');
   return `${dia}/${mes}/${anio}`;
+}
+
+function faltan(dias: number): string {
+  if (dias === 0) return 'Vence hoy';
+  if (dias === 1) return 'Vence mañana';
+  return `Vence en ${dias} días`;
 }
 
 function cantidad(unidades: number): string {
