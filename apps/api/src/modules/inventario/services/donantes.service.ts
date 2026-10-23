@@ -1,8 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  type AltaDeDonante,
   type CambiosEnDonante,
   type Donante,
   DonantesRepositorio,
+  NombreDeDonanteRepetido,
   TIPOS_DE_DONANTE,
   type TipoDonante,
 } from './donante.js';
@@ -27,12 +34,6 @@ export interface FiltroDeDonantes {
 
 export type EdicionDeDonante = Partial<NuevoDonante>;
 
-export interface AltaDeDonante {
-  donante: Donante;
-  /** Ya había uno activo con ese nombre y tipo: se devolvió ese. */
-  repetido: boolean;
-}
-
 /**
  * Directorio de donantes (SBA-25, RF-M1-18).
  *
@@ -51,26 +52,15 @@ export class DonantesService {
   /**
    * El alta va en línea y sin `comandoId`: la llave natural es nombre y tipo.
    * Un doble toque o un reenvío devuelve el donante activo que ya existe en
-   * vez de duplicarlo.
+   * vez de duplicarlo. Esa búsqueda es del repositorio, en la misma
+   * transacción del alta.
    */
   async darDeAlta(nuevo: NuevoDonante): Promise<AltaDeDonante> {
-    const nombre = nombreValido(nuevo.nombre);
-    const tipo = tipoValido(nuevo.tipo);
-    const parecidos = await this.repositorio.buscar({
-      texto: nombre,
-      tipo,
-      soloActivos: true,
-      limite: LIMITE_DE_BUSQUEDA,
-    });
-    const existente = parecidos.find((d) => mismoNombre(d.nombre, nombre));
-    if (existente) return { donante: existente, repetido: true };
-
-    const donante = await this.repositorio.crear({
-      nombre,
-      tipo,
+    return this.repositorio.crear({
+      nombre: nombreValido(nuevo.nombre),
+      tipo: tipoValido(nuevo.tipo),
       contacto: contactoLimpio(nuevo.contacto),
     });
-    return { donante, repetido: false };
   }
 
   async buscar(filtro: FiltroDeDonantes = {}): Promise<Donante[]> {
@@ -105,7 +95,12 @@ export class DonantesService {
   }
 
   private async actualizar(id: string, cambios: CambiosEnDonante): Promise<Donante> {
-    const donante = await this.repositorio.actualizar(id, cambios);
+    const donante = await this.repositorio.actualizar(id, cambios).catch((error: unknown) => {
+      if (error instanceof NombreDeDonanteRepetido) {
+        throw new ConflictException('Ya existe un donante activo con ese nombre y tipo.');
+      }
+      throw error;
+    });
     // RLS no distingue «no existe» de «es de otro banco», y está bien: la
     // respuesta tampoco debe distinguirlos.
     if (!donante) throw new NotFoundException('No existe ese donante.');
@@ -122,11 +117,6 @@ function nombreValido(nombre: string): string {
     );
   }
   return limpio;
-}
-
-/** Sin distinguir mayúsculas; las tildes sí cuentan, como en la búsqueda de Postgres. */
-function mismoNombre(a: string, b: string): boolean {
-  return a.localeCompare(b, 'es', { sensitivity: 'accent' }) === 0;
 }
 
 function tipoValido(tipo: string): TipoDonante {

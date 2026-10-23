@@ -1,11 +1,13 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  type AltaDeDonante,
   type BusquedaDeDonantes,
   type CambiosEnDonante,
   type DatosDeDonante,
   type Donante,
   DonantesRepositorio,
+  NombreDeDonanteRepetido,
 } from './donante.js';
 import { DonantesService } from './donantes.service.js';
 
@@ -14,26 +16,47 @@ class RepositorioEnMemoria extends DonantesRepositorio {
   donantes: Donante[] = [];
   ultimaBusqueda?: BusquedaDeDonantes;
 
-  async crear(datos: DatosDeDonante): Promise<Donante> {
+  /** Como el adaptador: un activo con el mismo tipo y nombre se devuelve en vez de duplicarse. */
+  async crear(datos: DatosDeDonante): Promise<AltaDeDonante> {
+    const existente = this.donantes.find(
+      (d) =>
+        d.activo && d.tipo === datos.tipo && d.nombre.toLowerCase() === datos.nombre.toLowerCase(),
+    );
+    if (existente) return { donante: existente, repetido: true };
     const donante = { id: `d-${this.donantes.length + 1}`, activo: true, ...datos };
     this.donantes.push(donante);
-    return donante;
+    return { donante, repetido: false };
   }
 
+  /** Ordena por nombre y corta en el límite, como la base: sin eso no se vería el tope de la búsqueda. */
   async buscar(busqueda: BusquedaDeDonantes): Promise<Donante[]> {
     this.ultimaBusqueda = busqueda;
-    return this.donantes.filter(
-      (d) =>
-        (!busqueda.id || d.id === busqueda.id) &&
-        (!busqueda.texto || d.nombre.toLowerCase().includes(busqueda.texto.toLowerCase())) &&
-        (!busqueda.tipo || d.tipo === busqueda.tipo) &&
-        (!busqueda.soloActivos || d.activo),
-    );
+    return this.donantes
+      .filter(
+        (d) =>
+          (!busqueda.id || d.id === busqueda.id) &&
+          (!busqueda.texto || d.nombre.toLowerCase().includes(busqueda.texto.toLowerCase())) &&
+          (!busqueda.tipo || d.tipo === busqueda.tipo) &&
+          (!busqueda.soloActivos || d.activo),
+      )
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+      .slice(0, busqueda.limite);
   }
 
+  /** Como el índice único parcial: dos activos no comparten tipo y nombre. */
   async actualizar(id: string, cambios: CambiosEnDonante): Promise<Donante | null> {
     const donante = this.donantes.find((d) => d.id === id);
     if (!donante) return null;
+    const despues = { ...donante, ...cambios };
+    const choca = this.donantes.some(
+      (d) =>
+        d.id !== id &&
+        despues.activo &&
+        d.activo &&
+        d.tipo === despues.tipo &&
+        d.nombre.toLowerCase() === despues.nombre.toLowerCase(),
+    );
+    if (choca) throw new NombreDeDonanteRepetido();
     Object.assign(donante, cambios);
     return donante;
   }
@@ -69,6 +92,20 @@ describe('DonantesService', () => {
 
       expect(otro.repetido).toBe(false);
       expect(repositorio.donantes).toHaveLength(3);
+    });
+
+    it('encuentra el repetido aunque haya veinte nombres parecidos que ordenan antes', async () => {
+      for (let n = 10; n < 30; n++) {
+        await servicio.darDeAlta({ nombre: `Almacén Éxito ${n}`, tipo: 'empresa' });
+      }
+      const primero = await servicio.darDeAlta({ nombre: 'Éxito', tipo: 'empresa' });
+      const segundo = await servicio.darDeAlta({ nombre: 'éxito', tipo: 'empresa' });
+
+      expect(primero.repetido).toBe(false);
+      expect(segundo).toEqual({ donante: primero.donante, repetido: true });
+      expect(repositorio.donantes.filter((d) => d.nombre.toLowerCase() === 'éxito')).toHaveLength(
+        1,
+      );
     });
 
     it('no confunde un nombre que solo contiene al otro', async () => {
@@ -128,6 +165,19 @@ describe('DonantesService', () => {
       await expect(
         servicio.crear({ nombre: 'Alguien', tipo: 'particular', contacto: 'a'.repeat(201) }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza un contacto largo aunque el nombre ya exista, sin devolver el existente', async () => {
+      await servicio.darDeAlta({ nombre: 'Parroquia San José', tipo: 'parroquia' });
+
+      await expect(
+        servicio.darDeAlta({
+          nombre: 'Parroquia San José',
+          tipo: 'parroquia',
+          contacto: 'a'.repeat(201),
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repositorio.donantes).toHaveLength(1);
     });
 
     it('rechaza un tipo que no es del directorio', async () => {
@@ -208,6 +258,36 @@ describe('DonantesService', () => {
       await expect(servicio.editar('no-existe', { nombre: 'X' })).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('responde 409 si el nuevo nombre ya es de otro donante activo del mismo tipo', async () => {
+      await servicio.crear({ nombre: 'Parroquia San José', tipo: 'parroquia' });
+      const { id } = await servicio.crear({ nombre: 'Parroquia Santa Ana', tipo: 'parroquia' });
+
+      await expect(servicio.editar(id, { nombre: 'parroquia san josé' })).rejects.toThrow(
+        ConflictException,
+      );
+      expect(repositorio.donantes.map((d) => d.nombre)).toEqual([
+        'Parroquia San José',
+        'Parroquia Santa Ana',
+      ]);
+    });
+
+    it('responde 409 si al cambiar el tipo choca con un activo de ese tipo', async () => {
+      await servicio.crear({ nombre: 'Juan', tipo: 'empresa' });
+      const { id } = await servicio.crear({ nombre: 'Juan', tipo: 'particular' });
+
+      await expect(servicio.editar(id, { tipo: 'empresa' })).rejects.toThrow(ConflictException);
+    });
+
+    it('deja tomar el nombre de un donante desactivado', async () => {
+      const { id: viejo } = await servicio.crear({ nombre: 'Juan', tipo: 'particular' });
+      await servicio.desactivar(viejo);
+      const { id } = await servicio.crear({ nombre: 'Pedro', tipo: 'particular' });
+
+      const editado = await servicio.editar(id, { nombre: 'Juan' });
+
+      expect(editado.nombre).toBe('Juan');
     });
   });
 

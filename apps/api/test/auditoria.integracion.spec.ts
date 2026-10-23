@@ -69,7 +69,7 @@ describe.skipIf(!URL_ADMIN)('Auditoría contra PostgreSQL con el rol de la API',
   });
 
   it('el adaptador registra banco, actor, acción, entidad e id de la fila', async () => {
-    const fila = await conBanco(bancoA, () =>
+    const { donante: fila } = await conBanco(bancoA, () =>
       donantes.crear({ nombre: 'Donante de auditoría', tipo: 'empresa', contacto: null }),
     );
     const [registro] = await admin.$queryRaw<

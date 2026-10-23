@@ -280,6 +280,8 @@ model Donante {
 
   @@unique([bancoId, id])
   @@index([bancoId, tipo])
+  // El UNIQUE parcial (banco_id, tipo, lower(nombre)) WHERE activo vive en la
+  // migración 20261022170000: Prisma no expresa índices parciales sobre expresiones.
   @@map("donante")
   @@schema("inventario")
 }
