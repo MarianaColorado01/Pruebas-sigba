@@ -36,12 +36,20 @@ export class StockService {
 
   async consultar(filtro: FiltroDeStock = {}): Promise<LoteEnStock[]> {
     const hoy = DIA_EN_COLOMBIA.format(new Date());
-    const [saldos, rojo, amarillo] = await Promise.all([
+    // Una sola lectura de parámetros: cada una es una transacción, y con dos
+    // el p95 de 50 consultas a la vez pasaba de 1 s en CI (SBA-95).
+    const [saldos, vigentes] = await Promise.all([
       this.repositorio.saldos(filtro),
-      this.parametros.obtenerVigente('semaforo_rojo_dias', hoy),
-      this.parametros.obtenerVigente('semaforo_amarillo_dias', hoy),
+      this.parametros.listarVigentes(hoy),
     ]);
-    const umbrales = { rojo: rojo?.valor ?? null, amarillo: amarillo?.valor ?? null };
+    const umbral = (clave: 'semaforo_rojo_dias' | 'semaforo_amarillo_dias') => {
+      const parametro = vigentes.find((p) => p.clave === clave);
+      return typeof parametro?.valor === 'number' ? parametro.valor : null;
+    };
+    const umbrales = {
+      rojo: umbral('semaforo_rojo_dias'),
+      amarillo: umbral('semaforo_amarillo_dias'),
+    };
     return saldos.map((saldo) => {
       const dias = saldo.vencimiento === null ? null : diasEntre(hoy, saldo.vencimiento);
       return {

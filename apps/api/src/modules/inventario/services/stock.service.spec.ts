@@ -18,25 +18,25 @@ class StockEnMemoria extends StockRepositorio {
 /** Los parámetros vigentes del banco, con la fecha con que se consultaron. */
 class ParametrosEnMemoria extends ParametrosLectura {
   valores: Partial<Record<ClaveParametro, number>> = {};
+  /** La fecha de cada lectura: el stock lee todos los parámetros una sola vez. */
   fechas: (string | undefined)[] = [];
 
-  async obtenerVigente<K extends ClaveParametro>(
-    clave: K,
-    fecha?: string,
-  ): Promise<ParametroVigente<K> | null> {
-    this.fechas.push(fecha);
-    const valor = this.valores[clave];
-    if (valor === undefined) return null;
-    return {
-      valor,
-      version: 1,
-      fecha_inicio: '2026-01-01',
-      fecha_fin: null,
-    } as ParametroVigente<K>;
+  async obtenerVigente<K extends ClaveParametro>(): Promise<ParametroVigente<K> | null> {
+    throw new Error('El stock lee los umbrales con listarVigentes, en una sola transacción.');
   }
 
-  async listarVigentes(): Promise<ParametroListado[]> {
-    return [];
+  async listarVigentes(fecha?: string): Promise<ParametroListado[]> {
+    this.fechas.push(fecha);
+    return Object.entries(this.valores).map(
+      ([clave, valor]) =>
+        ({
+          clave,
+          valor,
+          version: 1,
+          fecha_inicio: '2026-01-01',
+          fecha_fin: null,
+        }) as ParametroListado,
+    );
   }
 }
 
@@ -135,7 +135,7 @@ describe('StockService', () => {
       [8, 'verde'],
       [null, null],
     ]);
-    expect(parametros.fechas).toEqual(['2026-10-15', '2026-10-15']);
+    expect(parametros.fechas).toEqual(['2026-10-15']);
   });
 
   it('sin umbrales configurados no hay semáforo, pero sí los días', async () => {
