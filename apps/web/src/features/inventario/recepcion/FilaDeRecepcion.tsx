@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Catalogo, ReferenciaDelCatalogo } from '@/shared/catalogo.ts';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
+import { CantidadLeida } from '../CantidadLeida.tsx';
 import { CrearPresentacion } from '../CrearPresentacion.tsx';
 import { buscarEnCatalogo } from '../useCatalogo.ts';
 import { NOVEDADES, type Novedad } from './enviarRecepcion.ts';
@@ -110,16 +111,19 @@ export function FilaDeRecepcion({ numero, fila, catalogo, onCambio, onQuitar }: 
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-2 font-medium">
-          Cantidad
-          <Input
-            inputMode="decimal"
-            placeholder="Ej. 12"
-            className="h-12 text-base"
-            value={fila.cantidad}
-            onChange={(evento) => onCambio({ cantidad: evento.target.value })}
-          />
-        </label>
+        <div className="flex flex-col gap-2">
+          <label className="flex flex-col gap-2 font-medium">
+            Cantidad
+            <Input
+              inputMode="decimal"
+              placeholder="Ej. 12"
+              className="h-12 text-base"
+              value={fila.cantidad}
+              onChange={(evento) => onCambio({ cantidad: evento.target.value })}
+            />
+          </label>
+          <CantidadLeida texto={fila.cantidad} />
+        </div>
         <label className="flex flex-col gap-2 font-medium">
           Lote
           <Input

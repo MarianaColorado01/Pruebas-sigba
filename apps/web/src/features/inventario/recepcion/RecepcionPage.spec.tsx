@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { catalogoDb } from '@/offline/catalogoDb.ts';
 import type { Catalogo } from '@/shared/catalogo.ts';
+import { MENSAJE_DE_CANTIDAD, MENSAJE_DE_CIFRAS } from '@/shared/cantidad.ts';
 import { SesionContext } from '@/shared/sesion.ts';
 import type { ComandoDeRecepcion, RecepcionConfirmada } from './enviarRecepcion.ts';
 import { RecepcionPage } from './RecepcionPage.tsx';
@@ -199,5 +200,138 @@ describe('pantalla de recepción', () => {
 
     await screen.findByText('Escribe una cantidad mayor que cero en la referencia 1.');
     await waitFor(() => expect(comandosEnviados(fetchMock)).toEqual([]));
+  });
+
+  it('rechaza «4.200»: en Colombia son 4200, no 4,2, y no envía nada', async () => {
+    const fetchMock = api(async (comando) => json(confirmada(comando), 201));
+    vi.stubGlobal('fetch', fetchMock);
+    montar();
+
+    await llenar();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cantidad' }), {
+      target: { value: '4.200' },
+    });
+    expect(screen.getByText(MENSAJE_DE_CANTIDAD)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar recepción' }));
+
+    await screen.findByText('Revisa la cantidad de la referencia 1.');
+    expect(comandosEnviados(fetchMock)).toEqual([]);
+  });
+
+  it('rechaza más de tres decimales sin redondear y no envía nada', async () => {
+    const fetchMock = api(async (comando) => json(confirmada(comando), 201));
+    vi.stubGlobal('fetch', fetchMock);
+    montar();
+
+    await llenar();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cantidad' }), {
+      target: { value: '0,3333' },
+    });
+    expect(screen.getByText(MENSAJE_DE_CIFRAS)).toBeTruthy();
+    expect(screen.queryByText(/Se registrará/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar recepción' }));
+
+    await screen.findByText('Revisa la cantidad de la referencia 1.');
+    expect(comandosEnviados(fetchMock)).toEqual([]);
+  });
+
+  it('muestra la cantidad leída y envía 4200 como 4200', async () => {
+    const fetchMock = api(async (comando) => json(confirmada(comando), 201));
+    vi.stubGlobal('fetch', fetchMock);
+    montar();
+
+    await llenar();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cantidad' }), {
+      target: { value: '4200' },
+    });
+    expect(screen.getByText(/Se registrará: 4\.?200$/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar recepción' }));
+
+    await screen.findByRole('heading', { name: 'Recepción confirmada' });
+    expect(comandosEnviados(fetchMock)[0]?.detalles[0]?.cantidad).toBe('4200');
+  });
+
+  describe('reenvío tras perder la respuesta', () => {
+    async function conRespuestaPerdida() {
+      let intentos = 0;
+      const fetchMock = api(async (comando) => {
+        intentos += 1;
+        if (intentos === 1) throw new TypeError('Network error');
+        return json(confirmada(comando), 200);
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      montar();
+      await llenar();
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar recepción' }));
+      await screen.findByText(/Sin señal · no se registró todavía/);
+      return fetchMock;
+    }
+
+    it('volver a escribir lo mismo conserva el comandoId', async () => {
+      const fetchMock = await conRespuestaPerdida();
+
+      const lote = screen.getByRole('textbox', { name: 'Lote' });
+      fireEvent.change(lote, { target: { value: 'L-8' } });
+      fireEvent.change(lote, { target: { value: ' L-7 ' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+
+      await screen.findByRole('heading', { name: 'Recepción confirmada' });
+      const [primero, segundo] = comandosEnviados(fetchMock);
+      expect(segundo).toEqual(primero);
+    });
+
+    it('reescribir «12,5» como «12,50» conserva el comandoId', async () => {
+      const fetchMock = await conRespuestaPerdida();
+
+      fireEvent.change(screen.getByRole('textbox', { name: 'Cantidad' }), {
+        target: { value: '12,50' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+
+      await screen.findByRole('heading', { name: 'Recepción confirmada' });
+      const [primero, segundo] = comandosEnviados(fetchMock);
+      expect(segundo).toEqual(primero);
+    });
+
+    it('cambiar lo que se registra estrena comando', async () => {
+      const fetchMock = await conRespuestaPerdida();
+
+      fireEvent.change(screen.getByRole('textbox', { name: 'Cantidad' }), {
+        target: { value: '13' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar recepción' }));
+
+      await screen.findByRole('heading', { name: 'Recepción confirmada' });
+      const [primero, segundo] = comandosEnviados(fetchMock);
+      expect(segundo?.comandoId).not.toBe(primero?.comandoId);
+      expect(segundo?.detalles[0]?.cantidad).toBe('13');
+    });
+  });
+
+  it('bloquea el formulario mientras se envía y el éxito muestra lo enviado', async () => {
+    let responder: (respuesta: Response) => void = () => undefined;
+    const fetchMock = api(
+      () =>
+        new Promise<Response>((resolver) => {
+          responder = resolver;
+        }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    montar();
+
+    await llenar();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar recepción' }));
+    await screen.findByRole('button', { name: 'Enviando…' });
+
+    expect(screen.getByRole('textbox', { name: 'Cantidad' }).matches(':disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Cambiar referencia 1' }).matches(':disabled')).toBe(
+      true,
+    );
+    expect(screen.getByRole('button', { name: 'Propia' }).matches(':disabled')).toBe(true);
+
+    const [comando] = comandosEnviados(fetchMock);
+    responder(json(confirmada(comando as ComandoDeRecepcion), 201));
+    await screen.findByRole('heading', { name: 'Recepción confirmada' });
+    expect(screen.getByText('Arroz 1 kg')).toBeTruthy();
   });
 });

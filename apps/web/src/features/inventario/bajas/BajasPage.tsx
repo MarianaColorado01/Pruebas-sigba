@@ -2,10 +2,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { cn } from 'cn';
 import { uuidv7 } from '@/offline/uuidv7.ts';
+import { interpretarCantidad } from '@/shared/cantidad.ts';
 import { ErrorDeApi } from '@/shared/clienteHttp.ts';
 import type { LoteEnStock } from '@/shared/stock.ts';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
+import { CantidadLeida } from '../CantidadLeida.tsx';
 import { useBodegasActivas } from '../useBodegas.ts';
 import { STOCK_QUERY_KEY, useStock } from '../useStock.ts';
 import {
@@ -29,10 +31,17 @@ const MAXIMO_DE_LOTES = 8;
 
 const NUMERO = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 3 });
 
+/** El comando enviado sin respuesta y la carga con que se armó, sin los ids. */
+interface Pendiente {
+  carga: string;
+  comando: ComandoSobreUnLote;
+}
+
 /**
  * Bajas por producto no apto y ajustes de inventario con motivo (SBA-81,
  * RF-M1-13). El saldo no se edita: se corrige con un movimiento. El comando
- * se conserva entre reintentos y cambia solo si cambia lo que se registra.
+ * se conserva entre reintentos y cambia solo si cambia la carga que se
+ * registra: tocar un campo y dejarlo como estaba no cuenta.
  */
 export function BajasPage() {
   const stock = useStock();
@@ -42,26 +51,34 @@ export function BajasPage() {
 
   const [tipo, setTipo] = useState<TipoDeMovimiento>('baja');
   const [texto, setTexto] = useState('');
-  const [lote, setLote] = useState<LoteEnStock | null>(null);
+  /** Bodega y lote elegidos; el saldo se lee del stock vigente, que se recarga tras un 409. */
+  const [elegido, setElegido] = useState<string | null>(null);
   const [cantidad, setCantidad] = useState('');
   const [motivoDeBaja, setMotivoDeBaja] = useState<MotivoDeBaja | null>(null);
   const [sentido, setSentido] = useState<'sobra' | 'falta'>('falta');
   const [motivoDeAjuste, setMotivoDeAjuste] = useState('');
-  const [comando, setComando] = useState<ComandoSobreUnLote | null>(null);
+  /** El último comando enviado sin respuesta; se reenvía igual si la carga no cambió. */
+  const [pendiente, setPendiente] = useState<Pendiente | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [registrado, setRegistrado] = useState<MovimientoRegistrado | null>(null);
+  /** Lo que respondió la API y el lote que se envió, no el que haya ahora en pantalla. */
+  const [exito, setExito] = useState<{
+    registrado: MovimientoRegistrado;
+    lote: LoteEnStock;
+  } | null>(null);
 
   function cambio<T>(asignar: (valor: T) => void) {
     return (valor: T) => {
       asignar(valor);
-      setComando(null);
       setAviso(null);
     };
   }
 
   const nombreDeBodega = (id: string) =>
     bodegas.data?.find((bodega) => bodega.id === id)?.nombre ?? 'Bodega';
+
+  const lote = stock.data?.lotes.find((l) => claveDe(l) === elegido) ?? null;
+  const setLote = (l: LoteEnStock | null) => setElegido(l && claveDe(l));
 
   const buscado = normalizar(texto);
   const lotes = buscado
@@ -75,27 +92,37 @@ export function BajasPage() {
     : [];
 
   const faltante = queFalta(tipo, lote, cantidad, motivoDeBaja, motivoDeAjuste);
+  const datos =
+    !faltante && lote
+      ? datosDe(
+          lote,
+          interpretarCantidad(cantidad).valor ?? '',
+          tipo,
+          sentido,
+          motivoDeBaja,
+          motivoDeAjuste,
+        )
+      : null;
+  const carga = datos && JSON.stringify({ tipo, ...datos });
+  const esReintento = pendiente !== null && pendiente.carga === carga;
 
   async function registrarMovimiento() {
-    if (faltante || !lote) return setAviso(faltante);
-    const aEnviar = comando ?? {
-      comandoId: uuidv7(),
-      movimientoId: uuidv7(),
-      bodegaId: lote.bodegaId,
-      referenciaId: lote.referencia.id,
-      loteId: lote.loteId,
-      cantidad:
-        tipo === 'ajuste' && sentido === 'falta' ? `-${decimal(cantidad)}` : decimal(cantidad),
-      motivo: tipo === 'baja' ? (motivoDeBaja ?? '') : motivoDeAjuste.trim(),
-    };
-    setComando(aEnviar);
+    if (faltante || !lote || !datos || !carga) return setAviso(faltante);
+    const aEnviar = esReintento
+      ? pendiente.comando
+      : { comandoId: uuidv7(), movimientoId: uuidv7(), ...datos };
+    setPendiente({ carga, comando: aEnviar });
     setEnviando(true);
     setAviso(null);
     try {
-      setRegistrado(await registrar(tipo, aEnviar));
-      setComando(null);
+      setExito({ registrado: await registrar(tipo, aEnviar), lote });
+      setPendiente(null);
       void consultas.invalidateQueries({ queryKey: STOCK_QUERY_KEY });
     } catch (error) {
+      // Un saldo insuficiente suele ser un stock en pantalla que ya no es el real.
+      if (error instanceof ErrorDeApi && error.estado === 409) {
+        void consultas.invalidateQueries({ queryKey: STOCK_QUERY_KEY });
+      }
       setAviso(motivo(error));
     } finally {
       setEnviando(false);
@@ -108,10 +135,11 @@ export function BajasPage() {
     setCantidad('');
     setMotivoDeBaja(null);
     setMotivoDeAjuste('');
-    setRegistrado(null);
+    setExito(null);
   }
 
-  if (registrado && lote) {
+  if (exito) {
+    const { registrado, lote: enviado } = exito;
     return (
       <div className="mx-auto flex max-w-xl flex-col gap-5 p-4 sm:p-6">
         <div role="status">
@@ -120,8 +148,8 @@ export function BajasPage() {
           </h1>
         </div>
         <p className="text-lg">
-          {lote.referencia.producto.nombre} {lote.referencia.presentacion} ·{' '}
-          {lote.codigo ? `Lote ${lote.codigo}` : 'Lote sin código'} ·{' '}
+          {enviado.referencia.producto.nombre} {enviado.referencia.presentacion} ·{' '}
+          {enviado.codigo ? `Lote ${enviado.codigo}` : 'Lote sin código'} ·{' '}
           {NUMERO.format(Number(registrado.cantidad))} unidades (
           {NUMERO.format(Number(registrado.kilos))} kg)
         </p>
@@ -133,7 +161,11 @@ export function BajasPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-6 p-4 sm:p-6">
+    // Un fieldset deshabilitado bloquea todos los campos y botones de adentro.
+    <fieldset
+      disabled={enviando}
+      className="mx-auto flex max-w-xl min-w-0 flex-col gap-6 border-0 p-4 sm:p-6"
+    >
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Bajas y ajustes</h1>
         <p className="text-muted-foreground">El saldo no se edita: se corrige con un movimiento.</p>
@@ -183,7 +215,7 @@ export function BajasPage() {
             {buscado && stock.data && lotes.length === 0 && <p>No hay lotes con saldo así.</p>}
             {lotes.map((l) => (
               <Button
-                key={`${l.bodegaId}/${l.loteId}`}
+                key={claveDe(l)}
                 variant="outline"
                 className="h-auto min-h-12 justify-start py-3 text-left text-base whitespace-normal"
                 onClick={() => cambio(setLote)(l)}
@@ -212,16 +244,19 @@ export function BajasPage() {
         </div>
       )}
 
-      <label className="flex flex-col gap-2 text-lg font-semibold">
-        {tipo === 'baja' ? 'Unidades que salen' : 'Unidades de diferencia'}
-        <Input
-          inputMode="decimal"
-          placeholder="Ej. 3"
-          className="h-12 text-base"
-          value={cantidad}
-          onChange={(evento) => cambio(setCantidad)(evento.target.value)}
-        />
-      </label>
+      <div className="flex flex-col gap-2">
+        <label className="flex flex-col gap-2 text-lg font-semibold">
+          {tipo === 'baja' ? 'Unidades que salen' : 'Unidades de diferencia'}
+          <Input
+            inputMode="decimal"
+            placeholder="Ej. 3"
+            className="h-12 text-base"
+            value={cantidad}
+            onChange={(evento) => cambio(setCantidad)(evento.target.value)}
+          />
+        </label>
+        <CantidadLeida texto={cantidad} />
+      </div>
 
       {tipo === 'baja' ? (
         <fieldset className="flex flex-col gap-2">
@@ -258,13 +293,13 @@ export function BajasPage() {
       <Button size="lg" className="h-14 text-lg" disabled={enviando} onClick={registrarMovimiento}>
         {enviando
           ? 'Enviando…'
-          : comando
+          : esReintento
             ? 'Reintentar'
             : tipo === 'baja'
               ? 'Registrar baja'
               : 'Registrar ajuste'}
       </Button>
-    </div>
+    </fieldset>
   );
 }
 
@@ -291,19 +326,38 @@ function queFalta(
   motivoDeAjuste: string,
 ): string | null {
   if (!lote) return 'Elige el lote.';
-  if (!(Number(decimal(cantidad)) > 0)) return 'Escribe una cantidad mayor que cero.';
+  const { valor, error } = interpretarCantidad(cantidad);
+  if (error) return 'Revisa la cantidad.';
+  if (!(Number(valor) > 0)) return 'Escribe una cantidad mayor que cero.';
   if (tipo === 'baja' && !motivoDeBaja) return 'Elige el motivo de la baja.';
   if (tipo === 'ajuste' && !motivoDeAjuste.trim()) return 'Escribe el motivo del ajuste.';
   return null;
+}
+
+function claveDe(lote: LoteEnStock): string {
+  return `${lote.bodegaId}/${lote.loteId}`;
 }
 
 function normalizar(texto: string): string {
   return texto.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
 }
 
-/** La coma del teclado colombiano pasa a punto, que es lo que lee la API. */
-function decimal(texto: string): string {
-  return texto.trim().replace(',', '.');
+/** Lo que se registra, sin los ids que genera el celular. En el ajuste, la cantidad lleva el signo. */
+function datosDe(
+  lote: LoteEnStock,
+  cantidad: string,
+  tipo: TipoDeMovimiento,
+  sentido: 'sobra' | 'falta',
+  motivoDeBaja: MotivoDeBaja | null,
+  motivoDeAjuste: string,
+): Omit<ComandoSobreUnLote, 'comandoId' | 'movimientoId'> {
+  return {
+    bodegaId: lote.bodegaId,
+    referenciaId: lote.referencia.id,
+    loteId: lote.loteId,
+    cantidad: tipo === 'ajuste' && sentido === 'falta' ? `-${cantidad}` : cantidad,
+    motivo: tipo === 'baja' ? (motivoDeBaja ?? '') : motivoDeAjuste.trim(),
+  };
 }
 
 /** AAAA-MM-DD a DD/MM/AAAA sin pasar por Date, que lo correría de día según la zona. */

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { cn } from 'cn';
 import { uuidv7 } from '@/offline/uuidv7.ts';
+import { interpretarCantidad } from '@/shared/cantidad.ts';
 import type { ReferenciaDelCatalogo } from '@/shared/catalogo.ts';
 import { ErrorDeApi } from '@/shared/clienteHttp.ts';
 import { Button } from '@/ui/button';
@@ -33,11 +34,17 @@ function filaVacia(): Fila {
   };
 }
 
+/** El comando enviado sin respuesta y la carga con que se armó, sin los ids. */
+interface Pendiente {
+  carga: string;
+  comando: ComandoDeRecepcion;
+}
+
 /**
  * Recepción de una donación con red (SBA-80, RF-M1-01). El comando lleva un
  * `comandoId` del celular que se conserva entre reintentos y cambia solo si
- * cambia lo que se va a registrar: así un reenvío tras perder la señal no
- * duplica inventario.
+ * cambia la carga que se va a registrar: tocar un campo y dejarlo como estaba
+ * no cuenta, y un reenvío tras perder la señal no duplica inventario.
  */
 export function RecepcionPage() {
   const catalogo = useCatalogo();
@@ -48,17 +55,19 @@ export function RecepcionPage() {
   const [origen, setOrigen] = useState<Origen | null>(null);
   const [donante, setDonante] = useState<Donante | null>(null);
   const [filas, setFilas] = useState<Fila[]>(() => [filaVacia()]);
-  /** El último comando enviado sin respuesta; se reenvía igual. */
-  const [comando, setComando] = useState<ComandoDeRecepcion | null>(null);
+  /** El último comando enviado sin respuesta; se reenvía igual si la carga no cambió. */
+  const [pendiente, setPendiente] = useState<Pendiente | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [resultado, setResultado] = useState<ResultadoDeRecepcion | null>(null);
+  /** Lo que respondió la API y las referencias que se enviaron, no las que haya ahora en pantalla. */
+  const [exito, setExito] = useState<{
+    resultado: ResultadoDeRecepcion;
+    referencias: ReferenciaDelCatalogo[];
+  } | null>(null);
 
-  /** Cualquier cambio invalida el comando pendiente: lo que se enviará ya es otro. */
   function cambio<T>(asignar: (valor: T) => void) {
     return (valor: T) => {
       asignar(valor);
-      setComando(null);
       setAviso(null);
     };
   }
@@ -69,16 +78,21 @@ export function RecepcionPage() {
     );
 
   const faltante = queFalta(bodegaId, origen, donante, filas);
+  const carga = origen && donante && !faltante ? cargaDe(bodegaId, origen, donante, filas) : null;
+  const esReintento = pendiente !== null && pendiente.carga === carga;
 
   async function confirmar() {
-    if (faltante || !origen || !donante) return setAviso(faltante);
-    const aEnviar = comando ?? armarComando(bodegaId, origen, donante, filas);
-    setComando(aEnviar);
+    if (faltante || !origen || !donante || !carga) return setAviso(faltante);
+    const aEnviar = esReintento
+      ? pendiente.comando
+      : armarComando(bodegaId, origen, donante, filas);
+    const referencias = filas.flatMap((f) => (f.referencia ? [f.referencia] : []));
+    setPendiente({ carga, comando: aEnviar });
     setEnviando(true);
     setAviso(null);
     try {
-      setResultado(await enviar(aEnviar));
-      setComando(null);
+      setExito({ resultado: await enviar(aEnviar), referencias });
+      setPendiente(null);
     } catch (error) {
       setAviso(motivo(error));
     } finally {
@@ -89,21 +103,19 @@ export function RecepcionPage() {
   function otra() {
     setDonante(null);
     setFilas([filaVacia()]);
-    setResultado(null);
+    setExito(null);
   }
 
-  if (resultado) {
-    return (
-      <Resultado
-        resultado={resultado}
-        referencias={filas.flatMap((f) => (f.referencia ? [f.referencia] : []))}
-        onOtra={otra}
-      />
-    );
+  if (exito) {
+    return <Resultado resultado={exito.resultado} referencias={exito.referencias} onOtra={otra} />;
   }
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-6 p-4 sm:p-6">
+    // Un fieldset deshabilitado bloquea todos los campos y botones de adentro.
+    <fieldset
+      disabled={enviando}
+      className="mx-auto flex max-w-xl min-w-0 flex-col gap-6 border-0 p-4 sm:p-6"
+    >
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Recepción</h1>
         <p className="text-muted-foreground">Lo que llegó, de quién y a qué bodega.</p>
@@ -180,9 +192,9 @@ export function RecepcionPage() {
       {aviso && <p role="alert">{aviso}</p>}
 
       <Button size="lg" className="h-14 text-lg" disabled={enviando} onClick={confirmar}>
-        {enviando ? 'Enviando…' : comando ? 'Reintentar' : 'Confirmar recepción'}
+        {enviando ? 'Enviando…' : esReintento ? 'Reintentar' : 'Confirmar recepción'}
       </Button>
-    </div>
+    </fieldset>
   );
 }
 
@@ -271,10 +283,32 @@ function queFalta(
   if (!donante) return 'Elige o crea el donante.';
   const sinReferencia = filas.findIndex((f) => !f.referencia);
   if (sinReferencia >= 0) return `Elige la referencia ${sinReferencia + 1}.`;
-  const sinCantidad = filas.findIndex((f) => !(Number(decimal(f.cantidad)) > 0));
+  const malEscrita = filas.findIndex((f) => interpretarCantidad(f.cantidad).error);
+  if (malEscrita >= 0) return `Revisa la cantidad de la referencia ${malEscrita + 1}.`;
+  const sinCantidad = filas.findIndex((f) => !(Number(interpretarCantidad(f.cantidad).valor) > 0));
   if (sinCantidad >= 0)
     return `Escribe una cantidad mayor que cero en la referencia ${sinCantidad + 1}.`;
   return null;
+}
+
+/** Lo que se registra, sin los ids que genera el celular: dos cargas iguales son el mismo comando. */
+function cargaDe(bodegaId: string, origen: Origen, donante: Donante, filas: Fila[]): string {
+  return JSON.stringify({
+    donanteId: donante.id,
+    origen,
+    bodegaId,
+    detalles: filas.map(detalleDe),
+  });
+}
+
+function detalleDe(fila: Fila): Omit<ComandoDeRecepcion['detalles'][number], 'movimientoId'> {
+  return {
+    referenciaId: fila.referencia?.id ?? '',
+    cantidad: interpretarCantidad(fila.cantidad).valor ?? '',
+    lote: fila.lote.trim() || null,
+    vencimiento: fila.vencimiento || null,
+    novedad: fila.novedad || null,
+  };
 }
 
 function armarComando(
@@ -288,20 +322,8 @@ function armarComando(
     donanteId: donante.id,
     origen,
     bodegaId,
-    detalles: filas.map((fila) => ({
-      movimientoId: uuidv7(),
-      referenciaId: fila.referencia?.id ?? '',
-      cantidad: decimal(fila.cantidad),
-      lote: fila.lote.trim() || null,
-      vencimiento: fila.vencimiento || null,
-      novedad: fila.novedad || null,
-    })),
+    detalles: filas.map((fila) => ({ movimientoId: uuidv7(), ...detalleDe(fila) })),
   };
-}
-
-/** La coma del teclado colombiano pasa a punto, que es lo que lee la API. */
-function decimal(texto: string): string {
-  return texto.trim().replace(',', '.');
 }
 
 /** AAAA-MM-DD a DD/MM/AAAA sin pasar por Date, que lo correría de día según la zona. */
