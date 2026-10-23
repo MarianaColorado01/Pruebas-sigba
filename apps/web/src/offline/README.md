@@ -19,9 +19,10 @@ con `comandoId` UUIDv7, banco, usuario (`sub` de Auth0), carga y estado:
 - `pendiente`: guardado en el celular, sin respuesta de la API.
 - `enviado`: salió hacia la API. Si la app se cierra antes de la respuesta,
   vuelve a enviarse; la API lo reconoce por su `comandoId` (Arquitectura 6.1).
-- `confirmado`: la API respondió 200 o 201.
-- `conflicto`: la API lo rechazó (409, validación o regla de negocio). Se guarda
-  con el motivo y no se borra; la coordinación lo concilia (RF-M1-11).
+- `confirmado`: la API respondió 200 o 201. Se borra a los 7 días, al abrir la app.
+- `conflicto`: la API lo rechazó (409, validación, regla de negocio o 403 por
+  falta de permiso). Se guarda con el motivo y no se borra; la coordinación lo
+  concilia (RF-M1-11).
 
 `RUTA_DE_COMANDO` es la lista cerrada de comandos que acepta la cola. Solo
 entran comandos de inventario: nada con datos personales de beneficiarios.
@@ -32,7 +33,9 @@ a los 2, 4, 8… segundos, hasta un minuto. Con la sesión vencida la cola se
 detiene sin contar el intento y sigue cuando la persona vuelve a entrar.
 
 `app/ColaProvider.tsx` sincroniza al abrir la app, al encolar, al volver la red
-(sin esperar el reintento) y al recuperar la sesión. Una pantalla usa la cola
+y al recuperar la sesión. Solo volver la red y «Sincronizar ahora» se saltan la
+espera del reintento; un comando nuevo la respeta. Encolar con un `comandoId` de
+otro banco u otra persona lanza un error. Una pantalla usa la cola
 así:
 
 ```ts

@@ -11,8 +11,8 @@ const LIMITE_DE_ENVIO_MS = 20_000;
 
 /**
  * La cola de comandos sin señal del banco activo (ADR-10). Sincroniza al
- * abrir la app, al volver la red sin esperar el reintento (RNF-M1-05) y al
- * encolar. Volver a iniciar sesión recarga la app, así que la cola retoma al
+ * abrir la app, al encolar y al volver la red sin esperar el reintento
+ * (RNF-M1-05); al abrir también borra los confirmados de más de 7 días. Volver a iniciar sesión recarga la app, así que la cola retoma al
  * abrir. El token sigue en memoria: la cola guarda comandos, nunca
  * credenciales (ADR-06).
  */
@@ -46,6 +46,8 @@ export function ColaProvider({ children }: { children: ReactNode }) {
     });
     sincronizador.current = actual;
     void actual.disparar();
+    // Los confirmados viejos no hacen falta: la API los reconoce por su comandoId.
+    void colaDb.purgarConfirmados().catch(() => undefined);
 
     const alVolverLaRed = () => void actual.disparar(true);
     window.addEventListener('online', alVolverLaRed);
@@ -73,7 +75,8 @@ export function ColaProvider({ children }: { children: ReactNode }) {
         intentos: 0,
         proximoIntento: 0,
       });
-      void sincronizador.current?.disparar(true);
+      // Sin forzar: con la API caída, un comando nuevo no se salta la espera del reintento.
+      void sincronizador.current?.disparar();
       return guardado;
     },
     [bancoId, usuario],

@@ -177,20 +177,31 @@ describe('sincronizar', () => {
     expect(await estados(banco)).toEqual(['conflicto']);
   });
 
-  it('un 404 de la API es rechazo; un 403 se reintenta', async () => {
+  it('un 404 de la API es rechazo y no detiene la cola', async () => {
     const banco = uuidv7();
     await encolar(banco, 1);
     await correr(banco, () =>
       Promise.reject(new ErrorDeApi(404, 'Fila 1: no existe esa referencia o está desactivada.')),
     );
     expect(await estados(banco)).toEqual(['conflicto']);
+  });
 
-    const otro = uuidv7();
-    await encolar(otro, 1);
-    expect((await correr(otro, () => Promise.reject(new ErrorDeApi(403, 'Forbidden')))).tipo).toBe(
-      'reintentar',
-    );
-    expect(await estados(otro)).toEqual(['pendiente']);
+  it('un 403 deja el comando en conflicto con un aviso de permiso y la cola sigue', async () => {
+    const banco = uuidv7();
+    const [sinPermiso] = await encolar(banco, 3);
+    const enviar: Enviar = (comando) =>
+      comando.comandoId === sinPermiso
+        ? Promise.reject(new ErrorDeApi(403, 'Forbidden'))
+        : Promise.resolve({});
+
+    expect(await correr(banco, enviar)).toEqual({ tipo: 'al-dia' });
+
+    const [primero] = await colaDb.listar(banco, USUARIO);
+    expect(await estados(banco)).toEqual(['conflicto', 'confirmado', 'confirmado']);
+    expect(primero?.rechazo).toEqual({
+      estado: 403,
+      mensaje: 'No tienes permiso para registrar esto en este banco.',
+    });
   });
 
   it('deja de enviar cuando le dicen que pare, sin tocar lo que falta', async () => {

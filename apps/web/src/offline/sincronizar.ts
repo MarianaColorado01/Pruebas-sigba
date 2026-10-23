@@ -20,12 +20,16 @@ export function esperaTras(intentos: number): number {
 }
 
 /**
- * Lo que la API rechaza por el contenido del comando: validación, algo que no
- * existe, un 409 o una regla de negocio. Reenviarlo no cambia la respuesta.
- * Cualquier otra falla (sin red, 5xx, un 403 o una página de un proxy) se
- * reintenta: el servidor quizá nunca vio el comando.
+ * Lo que la API rechaza por el contenido del comando o por quien lo envía:
+ * validación, algo que no existe, un 409, una regla de negocio o un 403 porque
+ * la persona perdió el rol. Reenviarlo no cambia la respuesta, y reintentar un
+ * 403 bloquearía para siempre los comandos de atrás. Cualquier otra falla (sin
+ * red, 5xx o una página de un proxy) se reintenta: el servidor quizá nunca vio
+ * el comando.
  */
-const RECHAZOS = new Set([400, 404, 409, 422]);
+const RECHAZOS = new Set([400, 403, 404, 409, 422]);
+
+const MENSAJE_SIN_PERMISO = 'No tienes permiso para registrar esto en este banco.';
 
 function esRechazo(error: unknown): error is ErrorDeApi {
   return error instanceof ErrorDeApi && RECHAZOS.has(error.estado);
@@ -89,7 +93,11 @@ export async function sincronizar({
       const { estado, codigo, message } = error;
       await colaDb.actualizar(comando.comandoId, {
         estado: 'conflicto',
-        rechazo: { estado, mensaje: message, ...(codigo ? { codigo } : {}) },
+        rechazo: {
+          estado,
+          mensaje: estado === 403 ? MENSAJE_SIN_PERMISO : message,
+          ...(codigo ? { codigo } : {}),
+        },
       });
     }
   }

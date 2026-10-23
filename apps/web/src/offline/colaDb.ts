@@ -13,7 +13,7 @@ export type TipoDeComando = keyof typeof RUTA_DE_COMANDO;
 
 /**
  * `enviado`: salió hacia la API y no ha respondido. `conflicto`: la API lo
- * rechazó por una regla de negocio o por un 409; se conserva para conciliar.
+ * rechazó por una regla de negocio, un 409 o falta de permiso; se conserva para conciliar.
  */
 export type EstadoDeComando = 'pendiente' | 'enviado' | 'confirmado' | 'conflicto';
 
@@ -36,6 +36,8 @@ export interface ComandoEnCola {
   /** Lo que respondió la API al rechazarlo. */
   rechazo?: { estado: number; codigo?: string; mensaje: string };
 }
+
+const DIAS_DE_CONFIRMADOS = 7;
 
 /** Base aparte, como `sigba-stock`: no toca el esquema de `sigba-offline`. */
 class BaseDeCola extends Dexie {
@@ -61,11 +63,21 @@ export const colaDb = {
     return base.comandos.add(comando);
   },
 
-  /** Guarda el comando salvo que ya exista uno con su `comandoId`; devuelve el que quedó guardado. */
+  /**
+   * Guarda el comando salvo que ya exista uno con su `comandoId` para esa misma
+   * persona y banco; devuelve el que quedó guardado. Si el `comandoId` es de
+   * otro banco u otra persona lanza un error: un UUIDv7 repetido es un fallo
+   * del cliente, y devolver ese registro mostraría la carga de otro banco.
+   */
   agregarSiNoExiste(comando: ComandoEnCola): Promise<ComandoEnCola> {
     return base.transaction('rw', base.comandos, async () => {
       const existente = await base.comandos.get(comando.comandoId);
-      if (existente) return existente;
+      if (existente) {
+        if (existente.bancoId !== comando.bancoId || existente.usuario !== comando.usuario) {
+          throw new Error('Ese comandoId ya lo usa otro banco u otra persona en este celular.');
+        }
+        return existente;
+      }
       await base.comandos.add(comando);
       return comando;
     });
@@ -73,6 +85,17 @@ export const colaDb = {
 
   async actualizar(comandoId: string, cambios: Partial<ComandoEnCola>): Promise<void> {
     await base.comandos.update(comandoId, cambios);
+  },
+
+  /**
+   * Borra los confirmados de más de 7 días, de cualquier banco y persona de este
+   * celular. La API los reconoce por su `comandoId`, así que no se pierde nada.
+   */
+  async purgarConfirmados(ahora = Date.now()): Promise<void> {
+    const limite = ahora - DIAS_DE_CONFIRMADOS * 24 * 60 * 60 * 1000;
+    await base.comandos
+      .filter((c) => c.estado === 'confirmado' && Date.parse(c.creadoEn) < limite)
+      .delete();
   },
 
   /** Llama a `alCambiar` con la lista y otra vez cada vez que cambia. Devuelve cómo dejar de observar. */

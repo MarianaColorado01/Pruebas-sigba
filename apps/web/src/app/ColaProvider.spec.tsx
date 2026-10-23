@@ -127,6 +127,53 @@ describe('ColaProvider', () => {
     expect(Date.now() - inicio).toBeLessThan(30_000);
   });
 
+  it('un comando nuevo no se salta la espera del reintento de la cabeza de la cola', async () => {
+    getAccessTokenSilently.mockResolvedValue('synthetic-access-token');
+    const fetch = vi.fn().mockResolvedValue(respuesta(503, { message: 'Servicio no disponible' }));
+    vi.stubGlobal('fetch', fetch);
+    const { bancoId, cola } = montar();
+
+    await act(async () => {
+      await cola().encolar('recepcion', CARGA);
+    });
+    await waitFor(async () => expect((await colaDb.listar(bancoId, USUARIO))[0]?.intentos).toBe(1));
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await cola().encolar('recepcion', CARGA);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByText('pendiente')).toHaveLength(2);
+  });
+
+  it('al abrir borra los confirmados de más de 7 días', async () => {
+    getAccessTokenSilently.mockResolvedValue('synthetic-access-token');
+    vi.stubGlobal('fetch', vi.fn());
+    const bancoId = uuidv7();
+    const viejo = '2026-01-01T00:00:00.000Z';
+    await colaDb.agregar({
+      comandoId: uuidv7(),
+      bancoId,
+      usuario: USUARIO,
+      tipo: 'recepcion',
+      carga: CARGA,
+      estado: 'confirmado',
+      creadoEn: viejo,
+      intentos: 0,
+      proximoIntento: 0,
+    });
+
+    render(
+      <SesionContext value={{ rol: 'operario_bodega', bancoId, institucionId: null }}>
+        <ColaProvider>{null}</ColaProvider>
+      </SesionContext>,
+    );
+
+    await waitFor(async () => expect(await colaDb.listar(bancoId, USUARIO)).toEqual([]));
+  });
+
   it('con la sesión vencida no pierde nada: espera a que la persona vuelva a entrar', async () => {
     getAccessTokenSilently.mockRejectedValue({ error: 'login_required' });
     const fetch = vi.fn();
