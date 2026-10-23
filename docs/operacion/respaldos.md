@@ -16,7 +16,7 @@ Neon guarda el historial de cambios de cada rama durante una ventana que depende
 plan. Dentro de esa ventana se puede crear una rama desde un instante pasado o restaurar
 una rama a ese instante.
 
-- Plan en uso: Gratuito ([cuentas.md](../SBA-10/cuentas.md)).
+- Plan en uso: Gratuito ([cuentas.md](cuentas.md)).
 - Ventana de historial del plan Gratuito: [por verificar en el panel de Neon, Settings ›
   Storage]. Si es de horas, no alcanza para la meta de respaldos diarios y el volcado
   lógico deja de ser opcional.
@@ -98,7 +98,7 @@ pnpm --filter @sigba/api exec prisma migrate deploy
 # 4. Reaplicar los privilegios de la API.
 pnpm --filter @sigba/api run db:roles
 
-# 5. Clave de sigba_app: la del gestor de secretos, la misma de API_DATABASE_URL en Fly.io.
+# 5. Clave de sigba_app: la misma de API_DATABASE_URL en Fly.io, o una nueva que luego se carga allí.
 #    Dentro de psql, \password sigba_app la pide sin mostrarla ni dejarla en el historial.
 psql "$DATABASE_URL" -c "ALTER ROLE sigba_app LOGIN"
 psql "$DATABASE_URL"

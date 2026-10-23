@@ -4,10 +4,10 @@ Un tenant institucional autentica a las personas de toda la red. Auth0 emite tok
 
 ## Tenant y aplicaciones
 
-La universidad debe crear o asignar el tenant institucional. La cuenta propietaria, sus administradores y el plan quedan por confirmar. No registrar secretos del tenant en Git.
+El tenant de staging es `sigba-staging.us.auth0.com`, plan gratuito, a nombre de `ingenieria@uam.edu.co`. Titular, acceso y configuración actual están en [cuentas.md](../operacion/cuentas.md). No registrar secretos del tenant en Git.
 
 1. En Auth0, crear una aplicación **Single Page Application** para SIGBA.
-2. Configurar **Allowed Callback URLs** con `http://localhost:5173` y el origen exacto de Cloudflare Pages para staging. Agregar producción solo cuando exista su dominio.
+2. Configurar **Allowed Callback URLs** con `http://localhost:5173` y el origen exacto del Worker de staging (`https://staging.sigba.co`). Agregar producción solo cuando exista su dominio.
 3. Configurar **Allowed Logout URLs** y **Allowed Web Origins** con los mismos orígenes. No usar comodines en staging o producción.
 4. Copiar el dominio y el client ID a `VITE_AUTH0_DOMAIN` y `VITE_AUTH0_CLIENT_ID`.
 5. Crear una API con un identifier propio, por ejemplo `https://api.sigba.example`. El identifier debe coincidir exactamente con `AUTH0_AUDIENCE` y `VITE_AUTH0_AUDIENCE`.
@@ -19,7 +19,7 @@ La universidad debe crear o asignar el tenant institucional. La cuenta propietar
 11. Crear usuarios de prueba sintéticos y asignar roles operativos desde SIGBA, no desde claims de Auth0.
 12. En **Authentication > Database > Username-Password-Authentication**, dejar desactivado **Disable Sign Ups**. Las invitaciones de SIGBA (SBA-19, D2) abren el registro de Auth0 con `screen_hint: 'signup'`; sin registro, una persona nueva no puede crear su cuenta. Quien se registre sin invitación no tiene asignación y la API le responde 403.
 
-La API acepta solicitudes de navegador desde los orígenes exactos de `CORS_ORIGINS`, separados por coma. En local usa `http://localhost:5173`; en staging agrega el hostname exacto de Cloudflare Pages. No configures comodines.
+La API acepta solicitudes de navegador desde los orígenes exactos de `CORS_ORIGINS`, separados por coma. En local usa `http://localhost:5173`; en staging agrega el origen exacto del Worker (`https://staging.sigba.co`). No configures comodines.
 
 El issuer termina en `/`. Para el tenant `tenant-institucional.us.auth0.com`, configurar:
 
@@ -45,7 +45,7 @@ exports.onExecutePostLogin = async (event, api) => {
 };
 ```
 
-Esta Action es lo que la API espera; no se ha desplegado ni probado en el tenant institucional [por verificar]. Sin ella, aceptar una invitación responde 403 `correo_no_verificado`. Cuándo queda `email_verified` en verdadero para una cuenta nueva con contraseña, y si Auth0 deja entrar antes de verificar, depende de la configuración del tenant [por verificar].
+Esta Action es lo que la API espera. Está en el tenant de staging con el nombre «Correo en el access token»; falta confirmar que se probó [por verificar]. Sin ella, aceptar una invitación responde 403 `correo_no_verificado`. Cuándo queda `email_verified` en verdadero para una cuenta nueva con contraseña, y si Auth0 deja entrar antes de verificar, depende de la configuración del tenant [por verificar].
 
 ## Identidad y RLS
 
@@ -77,19 +77,16 @@ La migración asigna a filas antiguas un issuer legado no autenticable porque el
 
 ## Verificación en staging
 
-No hay acceso desde este repositorio al tenant institucional ni a staging. Antes de activar usuarios reales, completar estas comprobaciones con datos sintéticos:
+El 2026-10-22, en `sigba-staging.us.auth0.com`, quedaron configurados callback, logout y web origins para `localhost:5173`, `staging.sigba.co` y el origen `workers.dev` del Worker. Se comprobó el inicio de sesión desde `staging.sigba.co` y que una ruta protegida sin token responde 401. Antes de activar usuarios reales, completar el resto con datos sintéticos:
 
-- Confirmar callback, logout y web origins para `localhost:5173` y el hostname exacto de Cloudflare Pages.
 - Iniciar sesión y recargar la PWA. La aplicación puede pedir autenticación otra vez; confirmar que no guarda tokens en `localStorage`, `sessionStorage` ni IndexedDB y que conserva los comandos pendientes.
 - Llamar con el SDK a una ruta protegida que tenga `@Roles()`; confirmar que la solicitud lleva `Authorization: Bearer` y recibe respuesta autorizada.
-- Llamar la misma ruta sin token y con un token de otra audiencia; ambos casos deben responder 401. `/api/v1/health` es pública y no sirve para validar el guard.
+- Llamar la misma ruta con un token de otra audiencia; debe responder 401. `/api/v1/health` es pública y no sirve para validar el guard.
 - Cerrar sesión y confirmar el retorno al origen configurado.
 - Interrumpir la renovación del access token; confirmar que la PWA informa que requiere autenticación y conserva los comandos offline pendientes.
 - Revisar logs y Sentry para confirmar que no incluyen tokens, cabeceras `Authorization` ni claims personales.
 
 ## Preguntas abiertas
 
-- ¿Qué cuenta institucional será propietaria del tenant y quiénes serán sus administradores? [por verificar]
-- ¿Qué plan, límite de usuarios activos, flujo de invitaciones y política MFA usará el piloto, y cuál será su costo? [por verificar]
+- El tenant de staging está en el plan gratuito. ¿Alcanza su límite de usuarios activos para el piloto, qué política MFA se usa y cuánto costaría pasar de plan? [por verificar]
 - ¿Debe `plataforma.usuario` conservar `email` y `nombre` para invitaciones y administración de usuarios? La migración no debe borrar esos datos hasta que el Equipo 3 confirme el modelo.
-- ¿Cuáles son los dominios definitivos de staging y producción? [por verificar]

@@ -6,34 +6,21 @@ que diga otro.
 
 ## Cuentas y accesos
 
-- **Fly.io:** método de pago de verificación. Sin él no se despliega la API (SBA-7).
-  Confirmar el plan en el panel ([cuentas.md](../SBA-10/cuentas.md)).
-- **Fly.io:** crear la organización `sigba`. La organización personal no admite
-  miembros, así que hoy solo Mariana Colorado puede operar la API.
-- **Segundo administrador** en Auth0, Sentry, Cloudflare y Fly.io.
-- **Cloudflare:** la PWA de staging se publica en la cuenta Forjel, que eligió Mariana
-  Colorado. [cuentas.md](../SBA-10/cuentas.md) todavía lista la cuenta asociada a
-  `MarianaColorado01` y habla de Pages; su dueño (SBA-10) tiene que actualizarlo. R2
-  sigue sin cuenta definida [por verificar].
-- **Correo institucional:** titular de las cinco cuentas. Las cuentas siguen siendo
-  personales mientras no se defina (SBA-10). Alcance M3 asigna la titularidad a la
-  universidad.
-- **Almacén de 2FA y de secretos** del equipo: nombrarlo, sin guardar su contenido aquí.
+Las cuentas ya están a nombre de `ingenieria@uam.edu.co` ([cuentas.md](cuentas.md)).
+Queda abierto:
 
-## Secretos en GitHub
-
-- Ramas de Neon por PR: secreto `NEON_API_KEY` y variable `NEON_PROJECT_ID`
+- **Cuentas personales:** retirar las de Mariana Colorado y la cuenta Forjel de
+  Cloudflare, que se usaron antes de las institucionales.
+- **Origen `workers.dev`:** quitar `https://sigba-web-staging.iuva-ingenieria.workers.dev`
+  de la SPA de Auth0 y de `CORS_ORIGINS` cuando `staging.sigba.co` sea el único origen.
+- **Producción:** `app.sigba.co` (PWA) y `api.sigba.co` (API) todavía no existen.
+- **Neon:** si se activan las ramas por PR, crear `NEON_API_KEY` con alcance de proyecto,
+  no la de organización, y la variable `NEON_PROJECT_ID`
   ([ramas-neon-por-pr.md](../arquitectura/ramas-neon-por-pr.md)).
-- Entorno `staging`: `FLY_API_TOKEN`, `STAGING_DATABASE_URL`, `CLOUDFLARE_API_TOKEN`,
-  `CLOUDFLARE_ACCOUNT_ID`, `VITE_API_URL` y las tres `VITE_AUTH0_*`
-  ([despliegue.md](despliegue.md)).
-
-## Auth0
-
-- Tenant y aplicación SPA de staging, con el origen exacto del Worker
-  `sigba-web-staging` en callbacks, logout y web origins.
-- Action que agrega el correo verificado al access token, desplegada y probada
-  ([auth0-setup.md](../arquitectura/auth0-setup.md)).
+- **Titular universitario de la tarjeta y el dominio:** la tarjeta de Fly.io está a
+  nombre de Camilo Agudelo y `sigba.co` está registrado en la cuenta de Vercel «Scouts de
+  Colombia». Los dos pasan a un titular de la universidad, para que no dependan de una
+  persona ni de una organización externa.
 
 ## Respaldos y llaves
 
@@ -64,14 +51,14 @@ para este documento].
 
 Consumo esperado en staging [por verificar contra las facturas]:
 
-| Servicio   | Plan                  | Costo                                                   |
-| ---------- | --------------------- | ------------------------------------------------------- |
-| Fly.io     | Hobby (sin confirmar) | Una máquina `shared-cpu-1x` de 512 MB siempre encendida |
-| Neon       | Gratuito              | Sin costo dentro de los límites del plan                |
-| Cloudflare | Gratuito              | Sin costo dentro de los límites de Workers              |
-| Auth0      | Gratuito              | Sin costo dentro del límite de usuarios activos         |
-| Sentry     | Developer (gratuito)  | Sin costo dentro del límite de eventos                  |
-| CodeRabbit | Un asiento pagado     | Mensual ([CONTRIBUTING.md](../CONTRIBUTING.md))         |
+| Servicio   | Plan              | Costo                                                   |
+| ---------- | ----------------- | ------------------------------------------------------- |
+| Fly.io     | Pago por uso      | Una máquina `shared-cpu-1x` de 512 MB siempre encendida |
+| Neon       | Gratuito          | Sin costo dentro de los límites del plan                |
+| Cloudflare | Gratuito          | Sin costo dentro de los límites de Workers              |
+| Auth0      | Gratuito          | Sin costo dentro del límite de usuarios activos         |
+| Sentry     | Gratuito          | Sin costo dentro del límite de eventos                  |
+| CodeRabbit | Un asiento pagado | Mensual ([CONTRIBUTING.md](../CONTRIBUTING.md))         |
 
 Revisar el consumo de cada panel una vez al mes y anotarlo aquí.
 
@@ -79,7 +66,8 @@ Revisar el consumo de cada panel una vez al mes y anotarlo aquí.
 Alcance M3 lo deja a cargo del equipo con la universidad, titular de las cuentas. Hay que
 decidir:
 
-- Quién paga Fly.io y los planes que excedan el nivel gratuito.
+- Quién paga Fly.io, hoy con la tarjeta de Camilo Agudelo, y los planes que
+  excedan el nivel gratuito.
 - Quién opera: despliegues, respaldos, restauraciones y rotación de llaves.
 - Quién da soporte al Banco de Alimentos de Pereira y con qué horario.
 - Qué pasa con los datos si nadie asume la operación: exportarlos para el Banco y borrar

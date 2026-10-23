@@ -81,7 +81,8 @@ vez por rama de base:
    `sigba_app`.
 2. Desde `psql`, con la URL del dueño:
    `ALTER ROLE sigba_app LOGIN PASSWORD '<clave larga y aleatoria>'`. La clave
-   va al gestor de secretos y a Fly.io, nunca a Git.
+   va solo al secreto `API_DATABASE_URL` de Fly.io, nunca a Git; si se pierde,
+   se genera otra con este mismo paso.
 3. La API se conecta como `sigba_app` por `API_DATABASE_URL`, en los
    secretos de Fly.io. Las migraciones usan la URL del dueño en
    `DATABASE_URL`.

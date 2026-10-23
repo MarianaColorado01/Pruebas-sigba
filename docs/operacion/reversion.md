@@ -31,7 +31,7 @@ Cada `flyctl deploy` crea una release con su imagen en `registry.fly.io`.
    Corre el comando desde la raíz del repositorio para que lea `apps/api/fly.toml`.
    [por verificar: cuántas imágenes conserva el registro de Fly.io para una app.]
 
-3. Comprueba: `curl -fsS https://sigba-api-staging.fly.dev/api/v1/health` y
+3. Comprueba: `curl -fsS https://api-staging.sigba.co/api/v1/health` y
    `flyctl status --app sigba-api-staging`.
 
 4. Abre un PR con `git revert <commit>` del cambio que falló y mézclalo. El workflow
@@ -45,11 +45,11 @@ secretos y tolera el esquema nuevo, porque las migraciones solo agregan.
 Cada `cf deploy` crea una versión del Worker `sigba-web-staging` y la despliega al 100 %.
 Volver atrás es crear un despliegue que mande todo el tráfico a la versión anterior.
 Estos comandos salen de `cf cli search` y `--help` de `cf@1.0.0-beta.20`; no se han
-ejecutado contra la cuenta Forjel [por verificar].
+ejecutado contra la cuenta «IUVA - Ingeniería» [por verificar].
 
 ```bash
 export CLOUDFLARE_API_TOKEN=<token>   # el mismo del entorno staging
-export CLOUDFLARE_ACCOUNT_ID=<id de Forjel>
+export CLOUDFLARE_ACCOUNT_ID=<id de IUVA - Ingeniería>
 
 # 1. Versiones y despliegues recientes
 pnpm dlx cf@1.0.0-beta.20 workers versions list --worker-id sigba-web-staging
