@@ -61,7 +61,10 @@ export class BeneficiariosController {
     private readonly membresias: MembresiasService,
   ) {}
 
-  /** 201 `creada`; 200 `ya_activa`; 409 con `codigo` (`RegistroRechazado`). */
+  /**
+   * 201 `creada`; 200 `ya_activa`; 409 con `codigo` (`RegistroRechazado`). Un 400
+   * por el otorgante del consentimiento lleva `codigo` (`AltaInvalida`).
+   */
   @Post()
   async registrar(
     @Body() alta: RegistrarBeneficiarioDto,

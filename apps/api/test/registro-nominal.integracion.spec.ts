@@ -188,6 +188,104 @@ describe.skipIf(!URL_ADMIN)('Registro nominal contra PostgreSQL (SBA-27, SBA-28)
     expect(consentimiento?.recogido_por).toBe(actor);
   });
 
+  describe('quién otorga el consentimiento del menor (SBA-96)', () => {
+    const madre: AltaDeBeneficiario['persona'] = {
+      ...padre,
+      numeroDocumento: '1077000004',
+      nombres: 'Marta',
+      sexo: 'femenino',
+    };
+    const dos = [
+      { persona: padre, parentesco: 'padre' as const },
+      { persona: madre, parentesco: 'madre' as const },
+    ];
+
+    async function otorgante(): Promise<string | null> {
+      const [fila] = await admin.$queryRaw<{ numero_documento: string }[]>`
+        SELECT o.numero_documento
+        FROM beneficiarios.consentimiento c
+        JOIN beneficiarios.persona o ON o.id = c.otorgante_persona_id
+        JOIN beneficiarios.persona m ON m.id = c.persona_id
+        WHERE c.banco_id = ${banco}::uuid AND m.numero_documento = ${menor.numeroDocumento}`;
+      return fila?.numero_documento ?? null;
+    }
+
+    it('con dos representantes la fila queda con el que se indicó, no con el primero', async () => {
+      await en(banco, () =>
+        servicio.registrar(
+          alta({
+            persona: menor,
+            representantes: dos,
+            consentimiento: {
+              otorgado: true,
+              versionAviso: AVISO_DE_PRIVACIDAD.version,
+              otorganteNumeroDocumento: '1.077.000.004',
+            },
+          }),
+        ),
+      );
+
+      expect(await otorgante()).toBe('1077000004');
+    });
+
+    it('sin indicar cuál, el 400 no deja ninguna fila ni auditoría', async () => {
+      await expect(
+        en(banco, () => servicio.registrar(alta({ persona: menor, representantes: dos }))),
+      ).rejects.toMatchObject({ response: { codigo: 'otorgante_requerido' } });
+
+      expect({
+        persona: await contar('persona'),
+        consentimiento: await contar('consentimiento'),
+        representacion: await contar('representacion'),
+      }).toEqual({ persona: 0, consentimiento: 0, representacion: 0 });
+      const [auditoria] = await admin.$queryRaw<{ n: bigint }[]>`
+        SELECT count(*) AS n FROM core.auditoria WHERE banco_id = ${banco}::uuid`;
+      expect(Number(auditoria?.n)).toBe(0);
+    });
+
+    it('un menor que vuelve elige entre sus dos vigentes y la fila nueva lo refleja', async () => {
+      const consentimiento = (otorganteNumeroDocumento: string) => ({
+        otorgado: true as const,
+        versionAviso: AVISO_DE_PRIVACIDAD.version,
+        otorganteNumeroDocumento,
+      });
+      const primera = await en(banco, () =>
+        servicio.registrar(
+          alta({
+            persona: menor,
+            representantes: dos,
+            consentimiento: consentimiento('1077000003'),
+          }),
+        ),
+      );
+      if (primera.resultado !== 'creada') throw new Error('el alta debía crearse');
+      await en(banco, () => membresias.cerrar(primera.membresia.id, 'dejo_de_asistir'));
+
+      await expect(
+        en(banco, () => servicio.registrar(alta({ persona: menor, institucionId: institucionY }))),
+      ).rejects.toMatchObject({ response: { codigo: 'otorgante_requerido' } });
+
+      await en(banco, () =>
+        servicio.registrar(
+          alta({
+            persona: menor,
+            institucionId: institucionY,
+            consentimiento: consentimiento('1077000004'),
+          }),
+        ),
+      );
+
+      const filas = await admin.$queryRaw<{ numero_documento: string }[]>`
+        SELECT o.numero_documento
+        FROM beneficiarios.consentimiento c
+        JOIN beneficiarios.persona o ON o.id = c.otorgante_persona_id
+        JOIN beneficiarios.persona m ON m.id = c.persona_id
+        WHERE c.banco_id = ${banco}::uuid AND m.numero_documento = ${menor.numeroDocumento}
+        ORDER BY c.otorgado_en`;
+      expect(filas.map((f) => f.numero_documento)).toEqual(['1077000003', '1077000004']);
+    });
+  });
+
   it('el documento se guarda normalizado', async () => {
     await en(banco, () => servicio.registrar(alta()));
     const [fila] = await admin.$queryRaw<{ numero_documento: string }[]>`

@@ -4,6 +4,7 @@ import { useAsignacion, usePedir } from '@/shared/sesion';
 import type {
   BeneficiarioRegistrado,
   BuscarPorDocumento,
+  CodigoDeAltaInvalida,
   CodigoDeRegistroRechazado,
   FichaDeBeneficiario,
   InstitucionDto,
@@ -93,6 +94,16 @@ const RECHAZOS: Record<CodigoDeRegistroRechazado, string> = {
     'Otra alta de esta persona terminó primero. Toca Registrar otra vez para ver el resultado.',
 };
 
+const INVALIDAS: Record<CodigoDeAltaInvalida, string> = {
+  otorgante_requerido: 'Elige cuál representante autorizó por el menor.',
+  otorgante_invalido:
+    'Quien autoriza por el menor tiene que ser su representante. Busca el documento otra vez.',
+};
+
+/** `hasOwn` y no `in`: `'toString' in {}` es verdadero. */
+const segun = <C extends string>(tabla: Record<C, string>, codigo: string | undefined) =>
+  codigo !== undefined && Object.hasOwn(tabla, codigo) ? tabla[codigo as C] : undefined;
+
 /**
  * Qué decirle a la persona cuando la API rechaza. Nunca muestra el `message`
  * de la API: un error no debe repetir el documento ni otros datos personales.
@@ -102,11 +113,14 @@ export function mensajeDeError(error: unknown): string {
     return 'Sin conexión con el servidor. No se guardó nada: inténtalo de nuevo cuando tengas señal.';
   }
   if (error.estado === 409) {
-    return error.codigo && error.codigo in RECHAZOS
-      ? RECHAZOS[error.codigo as CodigoDeRegistroRechazado]
-      : 'No se pudo registrar por un conflicto. Busca el documento otra vez.';
+    return (
+      segun(RECHAZOS, error.codigo) ??
+      'No se pudo registrar por un conflicto. Busca el documento otra vez.'
+    );
   }
-  if (error.estado === 400) return 'Algún dato no es válido. Revisa el formulario.';
+  if (error.estado === 400) {
+    return segun(INVALIDAS, error.codigo) ?? 'Algún dato no es válido. Revisa el formulario.';
+  }
   if (error.estado === 403) return 'Tu rol no puede registrar beneficiarios en este banco.';
   if (error.estado === 404) {
     return 'La institución o el tipo de población ya no está activo. Elige otro.';

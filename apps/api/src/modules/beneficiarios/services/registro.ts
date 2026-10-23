@@ -68,6 +68,12 @@ export interface Aviso {
   finalidad: string;
 }
 
+/** Persona que representa hoy a un beneficiario. El documento, normalizado. */
+export interface RepresentanteVigente {
+  id: string;
+  numeroDocumento: string;
+}
+
 /**
  * Operaciones dentro de la transacción del alta. Todas usan el mismo cliente:
  * si una falla, no queda nada.
@@ -78,8 +84,8 @@ export interface TransaccionDeRegistro {
   personaPorDocumento(numeroDocumento: string): Promise<PersonaExistente | null>;
   crearPersona(datos: DatosDePersona): Promise<string>;
   crearBeneficiario(personaId: string, tipoPoblacionId: string): Promise<void>;
-  /** Ids de persona de los representantes vigentes del beneficiario. */
-  representantesVigentes(beneficiarioId: string): Promise<string[]>;
+  /** Los representantes vigentes del beneficiario, del más antiguo al más reciente. */
+  representantesVigentes(beneficiarioId: string): Promise<RepresentanteVigente[]>;
   crearRepresentacion(
     beneficiarioId: string,
     representanteId: string,

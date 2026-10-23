@@ -102,7 +102,7 @@ const SELECT = 'h-11 w-full rounded-md border border-input bg-input/20 px-3 text
  * Registro nominal de una persona en una sola pantalla (SBA-78, RNF-M2-08).
  * Primero se busca el documento: si la persona ya existe, se reutiliza y no
  * se crea otra (SBA-27). Un menor sin representante vigente necesita uno
- * (RF-M2-07).
+ * (RF-M2-07); con más de uno, se elige cuál autoriza por él (SBA-96).
  *
  * Solo en línea. Los datos viven en el estado del formulario y se pierden al
  * salir: nada va a IndexedDB, localStorage ni la caché offline (Arquitectura
@@ -121,6 +121,8 @@ export function PantallaRegistro() {
   const [consentimiento, setConsentimiento] = useState(false);
   const [representante, setRepresentante] = useState<Campos>(VACIA('cc'));
   const [parentesco, setParentesco] = useState<Parentesco | ''>('');
+  /** Documento del representante vigente que autoriza por el menor. */
+  const [otorgante, setOtorgante] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [hecho, setHecho] = useState<BeneficiarioRegistrado | null>(null);
 
@@ -132,10 +134,13 @@ export function PantallaRegistro() {
   const activa = beneficiario?.membresiaActiva ?? null;
   const nueva = ficha !== undefined && encontrada === null;
   const puedeRegistrar = ficha !== undefined && !tipoDistinto && !activa;
-  const pideRepresentante =
-    puedeRegistrar &&
-    esMenor(persona.tipoDocumento, persona.fechaNacimiento) &&
-    !beneficiario?.representantes.length;
+  const menor = puedeRegistrar && esMenor(persona.tipoDocumento, persona.fechaNacimiento);
+  const vigentes = beneficiario?.representantes ?? [];
+  const pideRepresentante = menor && vigentes.length === 0;
+  // La pantalla pide un representante nuevo solo si no hay vigentes: entre
+  // vigentes y nuevos hay más de uno solo con dos o más vigentes. Con uno, la
+  // API toma ese.
+  const eligeOtorgante = menor && vigentes.length > 1;
   const nombreDe = (id: string) =>
     instituciones.data?.find((i) => i.id === id)?.nombre ?? 'otra institución';
 
@@ -150,6 +155,7 @@ export function PantallaRegistro() {
     setPersona({ ...VACIA(documento.tipoDocumento), numeroDocumento: documento.numeroDocumento });
     setRepresentante(VACIA('cc'));
     setParentesco('');
+    setOtorgante('');
     setConsentimiento(false);
     setTipoPoblacionId(tipoDe(institucionId) ?? '');
     setError(null);
@@ -204,6 +210,7 @@ export function PantallaRegistro() {
         return 'El representante legal debe ser mayor de edad.';
       if (!parentesco) return 'Elige el parentesco del representante.';
     }
+    if (eligeOtorgante && !otorgante) return 'Elige cuál representante autorizó por el menor.';
     if (!consentimiento)
       return 'Sin la autorización de tratamiento de datos no se puede registrar.';
     return null;
@@ -224,7 +231,11 @@ export function PantallaRegistro() {
           ...(pideRepresentante && parentesco
             ? { representantes: [{ persona: aDatos(representante), parentesco }] }
             : {}),
-          consentimiento: { otorgado: true, versionAviso: AVISO_DE_PRIVACIDAD.version },
+          consentimiento: {
+            otorgado: true,
+            versionAviso: AVISO_DE_PRIVACIDAD.version,
+            ...(eligeOtorgante ? { otorganteNumeroDocumento: otorgante } : {}),
+          },
         }),
       );
     } catch (causa) {
@@ -438,6 +449,26 @@ export function PantallaRegistro() {
             </fieldset>
           )}
 
+          {eligeOtorgante && (
+            <Campo id="otorgante" etiqueta="Representante que autoriza">
+              <select
+                id="otorgante"
+                className={SELECT}
+                value={otorgante}
+                onChange={(e) => setOtorgante(e.target.value)}
+              >
+                <option value="" disabled>
+                  Elige el representante
+                </option>
+                {vigentes.map((v) => (
+                  <option key={v.persona.id} value={v.persona.numeroDocumento}>
+                    {v.persona.nombres} {v.persona.apellidos} ({NOMBRE_DE_PARENTESCO[v.parentesco]})
+                  </option>
+                ))}
+              </select>
+            </Campo>
+          )}
+
           <label className="flex items-start gap-3 rounded-xl border p-4">
             <input
               type="checkbox"
@@ -447,8 +478,8 @@ export function PantallaRegistro() {
             />
             <span className="flex flex-col gap-1">
               <span className="font-medium">
-                {pideRepresentante ? 'El representante autorizó' : 'La persona autorizó'} el
-                tratamiento de sus datos
+                {menor ? 'El representante autorizó' : 'La persona autorizó'} el tratamiento de sus
+                datos
               </span>
               <span className="text-sm">Finalidad: {AVISO_DE_PRIVACIDAD.finalidad}</span>
               <span className="text-sm text-muted-foreground">

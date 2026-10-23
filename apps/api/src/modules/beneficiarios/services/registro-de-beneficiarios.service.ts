@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   AVISO_DE_PRIVACIDAD,
+  type CodigoDeAltaInvalida,
   PARENTESCOS,
   type Parentesco,
   SEXOS,
@@ -34,7 +35,7 @@ export interface AltaDeBeneficiario {
   tipoPoblacionId: string;
   persona: PersonaRecibida;
   representantes?: { persona: PersonaRecibida; parentesco: Parentesco }[];
-  consentimiento: { otorgado: boolean; versionAviso: string };
+  consentimiento: { otorgado: boolean; versionAviso: string; otorganteNumeroDocumento?: string };
 }
 
 export type ResultadoDeAlta =
@@ -115,7 +116,14 @@ export class RegistroDeBeneficiariosService {
       );
     }
 
-    return this.repositorio.enTransaccion((tx) => this.alta(tx, alta, titular, representantes));
+    // Un documento mal formado no se rechaza aparte: no coincide con ningún
+    // representante y sale como `otorgante_invalido`.
+    const otorgante = alta.consentimiento.otorganteNumeroDocumento;
+    const otorganteDocumento = otorgante ? normalizarDocumento(otorgante) : null;
+
+    return this.repositorio.enTransaccion((tx) =>
+      this.alta(tx, alta, titular, representantes, otorganteDocumento),
+    );
   }
 
   /** Pasos 1 a 7 de la sección 7.2 del esquema, en una sola transacción. */
@@ -124,6 +132,7 @@ export class RegistroDeBeneficiariosService {
     { institucionId, tipoPoblacionId }: AltaDeBeneficiario,
     titular: DatosDePersona,
     representantes: { persona: DatosDePersona; parentesco: Parentesco }[],
+    otorganteDocumento: string | null,
   ): Promise<ResultadoDeAlta> {
     if (!(await tx.institucionActiva(institucionId))) {
       throw new NotFoundException('No existe esa institución o está desactivada.');
@@ -165,6 +174,20 @@ export class RegistroDeBeneficiariosService {
     if (!menor && representantes.length > 0) {
       throw new BadRequestException('Solo un menor de edad lleva representante.');
     }
+    // Antes de escribir: el consentimiento es append-only y no se corrige.
+    const vigentes = existente?.esBeneficiaria ? await tx.representantesVigentes(existente.id) : [];
+    const otorgante = menor
+      ? elegirOtorgante(
+          [...vigentes, ...representantes.map((r) => r.persona)].map((r) => r.numeroDocumento),
+          otorganteDocumento,
+        )
+      : null;
+    if (!menor && otorganteDocumento !== null) {
+      throw altaInvalida(
+        'otorgante_invalido',
+        'Una persona adulta no lleva otorgante: el consentimiento lo otorga ella.',
+      );
+    }
 
     const personaId = existente?.id ?? (await tx.crearPersona(titular));
     // Quien ya es beneficiaria conserva su tipo de población: el alta no lo
@@ -176,29 +199,61 @@ export class RegistroDeBeneficiariosService {
       await tx.crearBeneficiario(personaId, tipoPoblacionId);
     }
 
-    const vigentes = existente?.esBeneficiaria ? await tx.representantesVigentes(personaId) : [];
-    const nuevos: string[] = [];
+    const idPorDocumento = new Map(vigentes.map((v) => [v.numeroDocumento, v.id]));
     for (const [i, { persona, parentesco }] of representantes.entries()) {
       const guardado = representantesExistentes[i];
       const representanteId = guardado?.id ?? (await tx.crearPersona(persona));
       // Un representante nuevo firma su propio consentimiento (D48).
       if (!guardado) await tx.crearConsentimiento(representanteId, null, AVISO_DE_PRIVACIDAD);
-      if (!vigentes.includes(representanteId)) {
+      if (!vigentes.some((v) => v.id === representanteId)) {
         await tx.crearRepresentacion(personaId, representanteId, parentesco);
       }
-      nuevos.push(representanteId);
+      idPorDocumento.set(persona.numeroDocumento, representanteId);
     }
 
-    const otorgante = menor ? (nuevos[0] ?? vigentes[0]) : null;
-    if (menor && !otorgante) {
-      throw new BadRequestException('Un menor de edad necesita un representante adulto.');
+    // Un menor nunca queda con otorgante nulo: el consentimiento es append-only.
+    const otorganteId = otorgante === null ? null : idPorDocumento.get(otorgante);
+    if (otorganteId === undefined) {
+      throw new Error('El otorgante validado no quedó entre los representantes del alta.');
     }
-    await tx.crearConsentimiento(personaId, otorgante ?? null, AVISO_DE_PRIVACIDAD);
+    await tx.crearConsentimiento(personaId, otorganteId, AVISO_DE_PRIVACIDAD);
 
     const membresia = await tx.crearMembresia(personaId, institucionId);
     await tx.emitir(membresiaActivada(membresia));
     return { resultado: 'creada', personaId, membresia };
   }
+}
+
+/**
+ * Documento del representante que autoriza por un menor. `candidatos` son los
+ * vigentes y los de la solicitud; pueden repetirse si llega uno vigente.
+ */
+function elegirOtorgante(candidatos: string[], elegido: string | null): string {
+  const unicos = new Set(candidatos);
+  if (unicos.size === 0) {
+    throw new BadRequestException('Un menor de edad necesita un representante adulto.');
+  }
+  if (elegido !== null) {
+    if (!unicos.has(elegido)) {
+      throw altaInvalida(
+        'otorgante_invalido',
+        'Quien otorga el consentimiento tiene que ser un representante vigente o uno de los que vienen en el registro.',
+      );
+    }
+    return elegido;
+  }
+  if (unicos.size > 1) {
+    throw altaInvalida(
+      'otorgante_requerido',
+      'El menor tiene más de un representante: indica cuál otorga el consentimiento.',
+    );
+  }
+  return [...unicos][0] as string;
+}
+
+/** 400 con `codigo`, para que la pantalla sepa qué pedir (ver `AltaInvalida`). */
+function altaInvalida(codigo: CodigoDeAltaInvalida, message: string): BadRequestException {
+  return new BadRequestException({ codigo, message });
 }
 
 function documentoValido(numero: string, quien: string): string {

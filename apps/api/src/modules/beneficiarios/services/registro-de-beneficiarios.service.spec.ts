@@ -103,7 +103,10 @@ class BaseFalsa implements TransaccionDeRegistro {
   async representantesVigentes(beneficiarioId: string) {
     return this.representaciones
       .filter((r) => r.beneficiarioId === beneficiarioId)
-      .map((r) => r.representanteId);
+      .map((r) => ({
+        id: r.representanteId,
+        numeroDocumento: this.personas.find((p) => p.id === r.representanteId)!.numeroDocumento,
+      }));
   }
   async crearRepresentacion(beneficiarioId: string, representanteId: string, parentesco: string) {
     this.representaciones.push({ beneficiarioId, representanteId, parentesco });
@@ -444,6 +447,169 @@ describe('RegistroDeBeneficiariosService', () => {
         personaId: 'persona-1',
         otorganteId: 'persona-2',
         version: 'sintetico-0',
+      });
+    });
+
+    describe('quién otorga el consentimiento (SBA-96)', () => {
+      const madre: PersonaRecibida = {
+        ...padre,
+        numeroDocumento: '1088000004',
+        nombres: 'Marta',
+        sexo: 'femenino',
+      };
+      const dos = [
+        { persona: padre, parentesco: 'padre' as const },
+        { persona: madre, parentesco: 'madre' as const },
+      ];
+      const otorgado = (otorganteNumeroDocumento?: string) => ({
+        otorgado: true,
+        versionAviso: AVISO_DE_PRIVACIDAD.version,
+        otorganteNumeroDocumento,
+      });
+      /** El cuerpo del 400, o `null` si el alta pasó. */
+      const rechazo = async (envio: Promise<unknown>) =>
+        (
+          await envio.then(
+            () => null,
+            (e: BadRequestException) => e,
+          )
+        )?.getResponse();
+
+      it('con dos representantes nuevos otorga el indicado y no el primero', async () => {
+        await servicio.registrar(
+          alta({ persona: menor, representantes: dos, consentimiento: otorgado('1.088.000.004') }),
+        );
+
+        expect(base.consentimientos.at(-1)).toMatchObject({
+          personaId: 'persona-1',
+          otorganteId: 'persona-3',
+        });
+      });
+
+      it('con dos representantes y sin otorgante pide indicarlo y no escribe nada', async () => {
+        const cuerpo = await rechazo(
+          servicio.registrar(alta({ persona: menor, representantes: dos })),
+        );
+
+        expect(cuerpo).toMatchObject({ codigo: 'otorgante_requerido' });
+        expect(base.personas).toEqual([]);
+        expect(base.consentimientos).toEqual([]);
+      });
+
+      it('un documento ajeno a los representantes da otorgante_invalido sin repetirlo', async () => {
+        const cuerpo = await rechazo(
+          servicio.registrar(
+            alta({ persona: menor, representantes: dos, consentimiento: otorgado('999888777') }),
+          ),
+        );
+
+        expect(cuerpo).toMatchObject({ codigo: 'otorgante_invalido' });
+        expect(JSON.stringify(cuerpo)).not.toMatch(/999888777|1088000/);
+        expect(base.personas).toEqual([]);
+      });
+
+      it('un documento mal formado también da otorgante_invalido', async () => {
+        const cuerpo = await rechazo(
+          servicio.registrar(
+            alta({ persona: menor, representantes: dos, consentimiento: otorgado('¿?') }),
+          ),
+        );
+        expect(cuerpo).toMatchObject({ codigo: 'otorgante_invalido' });
+      });
+
+      it('el menor no se otorga a sí mismo el consentimiento', async () => {
+        const cuerpo = await rechazo(
+          servicio.registrar(
+            alta({
+              persona: menor,
+              representantes: [{ persona: padre, parentesco: 'padre' }],
+              consentimiento: otorgado(menor.numeroDocumento),
+            }),
+          ),
+        );
+        expect(cuerpo).toMatchObject({ codigo: 'otorgante_invalido' });
+      });
+
+      it('con un solo representante el campo se omite; si llega, es el suyo', async () => {
+        await servicio.registrar(
+          alta({ persona: menor, representantes: [{ persona: padre, parentesco: 'padre' }] }),
+        );
+        expect(base.consentimientos.at(-1)?.otorganteId).toBe('persona-2');
+
+        const cuerpo = await rechazo(
+          servicio.registrar(
+            alta({
+              persona: { ...menor, numeroDocumento: '1088000010' },
+              representantes: [{ persona: padre, parentesco: 'padre' }],
+              consentimiento: otorgado(madre.numeroDocumento),
+            }),
+          ),
+        );
+        expect(cuerpo).toMatchObject({ codigo: 'otorgante_invalido' });
+      });
+
+      it('un vigente y uno nuevo cuentan juntos: sin otorgante se rechaza, con él se elige', async () => {
+        await servicio.registrar(
+          alta({ persona: menor, representantes: [{ persona: padre, parentesco: 'padre' }] }),
+        );
+        base.membresias[0]!.finEn = new Date();
+        const vuelve = alta({
+          persona: menor,
+          institucionId: institucionY,
+          representantes: [{ persona: madre, parentesco: 'madre' }],
+        });
+
+        const cuerpo = await rechazo(servicio.registrar(vuelve));
+        expect(cuerpo).toMatchObject({ codigo: 'otorgante_requerido' });
+        expect(base.representaciones).toHaveLength(1);
+        expect(base.consentimientos).toHaveLength(2);
+
+        await servicio.registrar({ ...vuelve, consentimiento: otorgado(padre.numeroDocumento) });
+        expect(base.consentimientos.at(-1)).toMatchObject({
+          personaId: 'persona-1',
+          otorganteId: 'persona-2',
+        });
+        expect(base.representaciones).toHaveLength(2);
+      });
+
+      it('un menor que vuelve con dos vigentes elige cuál otorga', async () => {
+        await servicio.registrar(
+          alta({ persona: menor, representantes: dos, consentimiento: otorgado('1088000003') }),
+        );
+        base.membresias[0]!.finEn = new Date();
+        const vuelve = alta({ persona: menor, institucionId: institucionY });
+
+        const cuerpo = await rechazo(servicio.registrar(vuelve));
+        expect(cuerpo).toMatchObject({ codigo: 'otorgante_requerido' });
+
+        await servicio.registrar({ ...vuelve, consentimiento: otorgado('1088000004') });
+        expect(base.consentimientos.at(-1)).toMatchObject({ otorganteId: 'persona-3' });
+      });
+
+      it('el documento se compara normalizado', async () => {
+        await servicio.registrar(
+          alta({
+            persona: menor,
+            representantes: dos,
+            consentimiento: otorgado(' 1-088-000-003 '),
+          }),
+        );
+        expect(base.consentimientos.at(-1)?.otorganteId).toBe('persona-2');
+      });
+
+      it('una adulta no lleva otorgante', async () => {
+        const cuerpo = await rechazo(
+          servicio.registrar(alta({ consentimiento: otorgado(adulta.numeroDocumento) })),
+        );
+        expect(cuerpo).toMatchObject({ codigo: 'otorgante_invalido' });
+        expect(base.personas).toEqual([]);
+      });
+
+      it('un menor sin representante sigue sin codigo: no hay a quién elegir', async () => {
+        const cuerpo = await rechazo(
+          servicio.registrar(alta({ persona: menor, consentimiento: otorgado('1088000003') })),
+        );
+        expect(cuerpo).not.toHaveProperty('codigo');
       });
     });
 

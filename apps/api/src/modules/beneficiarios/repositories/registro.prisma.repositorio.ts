@@ -166,9 +166,12 @@ export class RegistroPrismaRepositorio extends RegistroRepositorio {
           await tx.representacion.findMany({
             where: { beneficiarioId, finEn: null },
             orderBy: { inicioEn: 'asc' },
-            select: { representantePersonaId: true },
+            select: { representante: { select: { id: true, numeroDocumento: true } } },
           })
-        ).map((r) => r.representantePersonaId),
+        ).map(({ representante }) => ({
+          id: representante.id,
+          numeroDocumento: deColumnas(representante),
+        })),
 
       crearRepresentacion: async (beneficiarioId, representanteId, parentesco: Parentesco) => {
         const { id } = await tx.representacion.create({

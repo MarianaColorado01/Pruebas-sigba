@@ -48,4 +48,19 @@ describe('mensajeDeError', () => {
       'No se pudo guardar. Inténtalo de nuevo.',
     );
   });
+
+  it('explica los 400 del otorgante y deja el genérico para los demás', () => {
+    expect(mensajeDeError(new ErrorDeApi(400, 'x', 'otorgante_requerido'))).toMatch(
+      /Elige cuál representante/,
+    );
+    expect(mensajeDeError(new ErrorDeApi(400, 'x', 'otorgante_invalido'))).toMatch(
+      /tiene que ser su representante/,
+    );
+    expect(mensajeDeError(new ErrorDeApi(400, 'x'))).toBe(
+      'Algún dato no es válido. Revisa el formulario.',
+    );
+    expect(mensajeDeError(new ErrorDeApi(400, 'x', 'toString'))).toBe(
+      'Algún dato no es válido. Revisa el formulario.',
+    );
+  });
 });

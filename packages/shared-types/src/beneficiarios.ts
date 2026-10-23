@@ -92,8 +92,9 @@ export interface RepresentanteNuevo {
 /**
  * Cuerpo de `POST /api/v1/beneficiarios`. Lo usan coordinación y admin_banco.
  *
- * Un menor de 18 años lleva al menos un representante; el primero otorga el
- * consentimiento por él. Sin `consentimiento.otorgado` el alta se rechaza.
+ * Un menor de 18 años necesita al menos un representante, vigente o en
+ * `representantes`, y uno de ellos otorga el consentimiento por él (ver
+ * `otorganteNumeroDocumento`). Sin `consentimiento.otorgado` el alta se rechaza.
  * No lleva `comandoId`: un reenvío encuentra a la persona por documento y su
  * membresía activa, y responde `ya_activa`.
  */
@@ -106,6 +107,13 @@ export interface RegistrarBeneficiario {
     otorgado: true;
     /** La de `AVISO_DE_PRIVACIDAD` que se mostró. */
     versionAviso: string;
+    /**
+     * Documento del representante que autoriza por el menor: uno vigente (la
+     * ficha de la búsqueda los trae) o uno de `representantes`. Obligatorio si
+     * entre los dos hay más de uno; con uno solo, otorga ese. Un adulto no lo
+     * lleva. Admite puntos, guiones y espacios, como `numeroDocumento`.
+     */
+    otorganteNumeroDocumento?: string;
   };
 }
 
@@ -144,6 +152,23 @@ export type CodigoDeRegistroRechazado = 'duplicidad' | 'tipo_distinto' | 'regist
 
 export interface RegistroRechazado {
   codigo: CodigoDeRegistroRechazado;
+  message: string;
+}
+
+/**
+ * `codigo` de un 400 de `POST /api/v1/beneficiarios` que la pantalla tiene que
+ * resolver con la persona, en el cuerpo junto a `message`. Los demás 400 no
+ * llevan `codigo`.
+ *
+ * - `otorgante_requerido`: el menor tiene más de un representante y falta
+ *   `consentimiento.otorganteNumeroDocumento`.
+ * - `otorgante_invalido`: ese documento no es de un representante vigente ni
+ *   de uno de `representantes`, o la persona es adulta y no lleva otorgante.
+ */
+export type CodigoDeAltaInvalida = 'otorgante_requerido' | 'otorgante_invalido';
+
+export interface AltaInvalida {
+  codigo: CodigoDeAltaInvalida;
   message: string;
 }
 

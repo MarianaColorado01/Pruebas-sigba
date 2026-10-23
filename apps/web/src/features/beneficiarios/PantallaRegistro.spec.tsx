@@ -321,6 +321,86 @@ describe('PantallaRegistro', () => {
 
     await screen.findByText('Registrada en Parroquia San José.');
     expect(cuerpoDelAlta(fetch)).not.toHaveProperty('representantes');
+    expect(cuerpoDelAlta(fetch)?.consentimiento).not.toHaveProperty('otorganteNumeroDocumento');
+    expect(screen.queryByLabelText('Representante que autoriza')).toBeNull();
+  });
+
+  describe('un menor con dos representantes vigentes', () => {
+    const menor: PersonaDto = { ...adulta, tipoDocumento: 'ti', fechaNacimiento: '2014-05-05' };
+    const conDos: FichaDeBeneficiario = {
+      persona: menor,
+      beneficiario: {
+        tipoPoblacionId: 'tp-2',
+        membresiaActiva: null,
+        representantes: [
+          {
+            persona: { ...adulta, id: 'p-2', nombres: 'Marta', numeroDocumento: '41222333' },
+            parentesco: 'madre',
+          },
+          {
+            persona: { ...adulta, id: 'p-3', nombres: 'Luis', numeroDocumento: '10555666' },
+            parentesco: 'padre',
+          },
+        ],
+      },
+    };
+
+    async function abrir() {
+      escribir('Tipo de documento', 'ti');
+      buscar();
+      await screen.findByRole('form', { name: 'Registrar persona' });
+      await elegirSanJose();
+      autorizar();
+    }
+
+    it('pide elegir cuál autoriza y lo envía', async () => {
+      const fetch = conListas({
+        'POST /beneficiarios/busqueda': json(conDos),
+        'POST /beneficiarios': json(creada, 201),
+      });
+      montar();
+
+      await abrir();
+      expect(screen.queryByRole('group', { name: 'Representante legal' })).toBeNull();
+      expect(screen.getByText(/El representante autorizó/)).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Luis Sintética (Padre)' })).toBeInTheDocument();
+      registrar();
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Elige cuál representante autorizó por el menor.',
+      );
+      expect(cuerpoDelAlta(fetch)).toBeUndefined();
+
+      escribir('Representante que autoriza', '10555666');
+      registrar();
+
+      await screen.findByText('Registrada en Parroquia San José.');
+      expect(cuerpoDelAlta(fetch)).not.toHaveProperty('representantes');
+      expect(cuerpoDelAlta(fetch)?.consentimiento).toEqual({
+        otorgado: true,
+        versionAviso: 'sintetico-0',
+        otorganteNumeroDocumento: '10555666',
+      });
+    });
+
+    it('si la API rechaza al otorgante lo explica sin mostrar documentos', async () => {
+      conListas({
+        'POST /beneficiarios/busqueda': json(conDos),
+        'POST /beneficiarios': json(
+          { codigo: 'otorgante_invalido', message: 'El documento 10555666 no representa a nadie' },
+          400,
+        ),
+      });
+      montar();
+
+      await abrir();
+      escribir('Representante que autoriza', '10555666');
+      registrar();
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Quien autoriza por el menor tiene que ser su representante.',
+      );
+      expect(document.body.textContent).not.toContain('10555666');
+    });
   });
 
   it('avisa cuando el número existe con otro tipo de documento', async () => {

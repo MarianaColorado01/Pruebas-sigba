@@ -68,6 +68,10 @@ export class ConsentimientoDto {
 
   @IsString()
   versionAviso!: string;
+
+  @IsOptional()
+  @IsString()
+  otorganteNumeroDocumento?: string;
 }
 
 export class RegistrarBeneficiarioDto {

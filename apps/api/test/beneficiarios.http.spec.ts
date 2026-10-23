@@ -1,5 +1,5 @@
 import type { Server } from 'node:http';
-import type { INestApplication } from '@nestjs/common';
+import { BadRequestException, type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { AVISO_DE_PRIVACIDAD, CABECERAS, type Rol } from '@sigba/shared-types';
 import request from 'supertest';
@@ -163,6 +163,37 @@ describe('HTTP del registro nominal (SBA-27)', () => {
       .expect(400);
     await como('coordinacion')
       .send({ ...ALTA, persona: { ...ALTA.persona, tipoDocumento: 'otro' } })
+      .expect(400);
+    expect(registro.registrar).not.toHaveBeenCalled();
+  });
+
+  it('acepta consentimiento.otorganteNumeroDocumento y lo pasa al servicio', async () => {
+    registro.registrar.mockResolvedValueOnce({
+      resultado: 'creada',
+      personaId: 'p-1',
+      membresia: MEMBRESIA,
+    });
+    const alta = {
+      ...ALTA,
+      consentimiento: { ...ALTA.consentimiento, otorganteNumeroDocumento: '1.077.000.004' },
+    };
+
+    await como('coordinacion').send(alta).expect(201);
+
+    expect(registro.registrar).toHaveBeenCalledWith(alta);
+  });
+
+  it('400 con codigo otorgante_requerido y otorgante_invalido, sin datos personales', async () => {
+    for (const codigo of ['otorgante_requerido', 'otorgante_invalido'] as const) {
+      registro.registrar.mockRejectedValueOnce(new BadRequestException({ codigo, message: 'x' }));
+      const respuesta = await como('coordinacion').send(ALTA).expect(400);
+      expect(respuesta.body).toEqual({ codigo, message: 'x' });
+    }
+  });
+
+  it('400 si otorganteNumeroDocumento no es texto', async () => {
+    await como('coordinacion')
+      .send({ ...ALTA, consentimiento: { ...ALTA.consentimiento, otorganteNumeroDocumento: 7 } })
       .expect(400);
     expect(registro.registrar).not.toHaveBeenCalled();
   });
