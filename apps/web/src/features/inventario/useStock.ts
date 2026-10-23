@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { stockDb, type StockGuardado } from '@/offline/stockDb.ts';
 import { ErrorDeApi } from '@/shared/clienteHttp.ts';
@@ -78,11 +78,19 @@ export function useStock() {
   const datoLocal = cacheInicial?.bancoId === bancoId ? cacheInicial.data : undefined;
   const data = consulta.data ?? datoLocal;
   // Si la última consulta falló, lo que queda en pantalla ya no es la
-  // respuesta de la API, aunque lo haya sido (ADR-10).
-  return { ...consulta, data: data && consulta.isError ? { ...data, desactualizado: true } : data };
+  // respuesta de la API, aunque lo haya sido (ADR-10): se avisa y se
+  // recalcula con el día de hoy, que puede no ser el de esa respuesta.
+  const enPantalla = useMemo(
+    () => (data && consulta.isError ? aPantalla(data, true) : data),
+    [data, consulta.isError],
+  );
+  return { ...consulta, data: enPantalla };
 }
 
-function aPantalla({ lotes, obtenidoEn }: StockGuardado, desactualizado: boolean): StockEnPantalla {
+function aPantalla(
+  { lotes, obtenidoEn }: Pick<StockGuardado, 'lotes' | 'obtenidoEn'>,
+  desactualizado: boolean,
+): StockEnPantalla {
   if (!desactualizado) return { lotes, obtenidoEn, desactualizado };
   // La copia trae el estado del día en que se leyó: un lote que venció desde
   // entonces se ve vencido aunque no haya red. Los días se recalculan; el

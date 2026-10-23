@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { type ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { stockDb } from '@/offline/stockDb.ts';
 import { SesionContext } from '@/shared/sesion.ts';
 import type { LoteEnStock } from '@/shared/stock.ts';
 import { StockPage } from './StockPage.tsx';
+import { useStock } from './useStock.ts';
 
 vi.mock('@auth0/auth0-react', () => ({
   useAuth0: () => ({ getAccessTokenSilently: vi.fn().mockResolvedValue('synthetic-access-token') }),
@@ -170,6 +171,43 @@ describe('stock por bodega (SBA-36)', () => {
     await waitFor(() =>
       expect(screen.getByRole('status').textContent).toMatch(/posiblemente desactualizado$/),
     );
+  });
+
+  describe('cuando la API responde con error después de haber respondido bien', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('recalcula el vencimiento con el día de hoy, no el de la última respuesta', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-22T15:00:00Z'));
+      const venceHoy = [
+        lote({
+          loteId: 'lote-hoy',
+          vencimiento: '2026-10-22',
+          estado: 'vigente',
+          diasParaVencer: 0,
+          semaforo: 'rojo',
+        }),
+      ];
+      const fetchMock = vi.fn().mockResolvedValueOnce(respuesta(venceHoy));
+      vi.stubGlobal('fetch', fetchMock);
+      const { wrapper } = preparar();
+      const { result } = renderHook(() => useStock(), { wrapper });
+      await waitFor(() => expect(result.current.data?.lotes[0]?.semaforo).toBe('rojo'));
+
+      vi.setSystemTime(new Date('2026-10-23T15:00:00Z'));
+      fetchMock.mockResolvedValue(new Response('{}', { status: 500 }));
+      await result.current.refetch();
+
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect(result.current.data?.desactualizado).toBe(true);
+      expect(result.current.data?.lotes[0]).toMatchObject({
+        estado: 'vencido',
+        diasParaVencer: -1,
+        semaforo: null,
+      });
+    });
   });
 
   it('sin red y sin copia avisa que no pudo consultar', async () => {
