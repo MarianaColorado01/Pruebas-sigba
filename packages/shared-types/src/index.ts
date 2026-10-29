@@ -99,6 +99,30 @@ export type ParametroListado = {
 export type ParametroHistorial = ParametroListado;
 
 /**
+ * Claves que M1 y M2 leen de plataforma (SBA-34). `factor_minorista` queda
+ * fuera hasta acordar con los capitanes quién lo consume.
+ */
+export type ClaveParametroLectura = Exclude<ClaveParametro, 'factor_minorista'>;
+
+/**
+ * Lectura de un parámetro en una fecha (SBA-34). Sin versión vigente no hay
+ * valor por defecto: `encontrado` es `false`. Las fechas son días calendario
+ * de Bogotá (YYYY-MM-DD) y la vigencia es cerrada: [fechaInicio, fechaFin].
+ * El consumidor guarda `parametroId` en su movimiento (Arquitectura 8.7).
+ */
+export type ResultadoParametro<K extends ClaveParametroLectura> =
+  | {
+      encontrado: true;
+      clave: K;
+      valor: ValorParametro[K];
+      parametroId: string;
+      version: number;
+      fechaInicio: string;
+      fechaFin: string | null;
+    }
+  | { encontrado: false; clave: K; motivo: 'SIN_VALOR_VIGENTE'; fecha: string };
+
+/**
  * Banco de la red, como lo devuelve `GET /bancos` (SBA-19, D11). El código va
  * en mayúsculas y es único en la red.
  */
@@ -114,6 +138,14 @@ export interface BancoDto {
  * bodega inactiva no se ofrece para movimientos nuevos, pero no se borra.
  */
 export interface BodegaDto {
+  id: string;
+  nombre: string;
+  direccion: string | null;
+  activa: boolean;
+}
+
+/** Bodega como la leen M1 y M2 desde `BodegasService` (SBA-34). */
+export interface BodegaLectura {
   id: string;
   nombre: string;
   direccion: string | null;

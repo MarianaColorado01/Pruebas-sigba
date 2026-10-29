@@ -1,4 +1,4 @@
-import type { BodegaDto } from '@sigba/shared-types';
+import type { BodegaDto, BodegaLectura } from '@sigba/shared-types';
 
 /**
  * Bodega del banco y los dos puertos por los que se lee y se administra.
@@ -21,6 +21,12 @@ export interface Bodega {
 export abstract class BodegasRepositorio {
   /** `null` si el banco del contexto no tiene esa bodega o está desactivada. */
   abstract activa(id: string): Promise<Bodega | null>;
+
+  /** Las activas del banco del contexto, por nombre y luego por id. */
+  abstract activas(): Promise<BodegaLectura[]>;
+
+  /** Activa o no; `null` si el banco del contexto no tiene esa bodega. */
+  abstract porId(id: string): Promise<BodegaLectura | null>;
 }
 
 /** La bodega completa, como la administra `admin_banco`. */

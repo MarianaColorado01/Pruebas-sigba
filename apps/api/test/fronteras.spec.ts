@@ -85,6 +85,30 @@ describe('un módulo solo entra a otro por su index.ts', () => {
     expect(publico).toEqual([]);
   });
 
+  it('M1 y M2 leen bodegas y parámetros solo por el index de plataforma (SBA-34)', async () => {
+    const publico = await fronterasDe(
+      'src/modules/beneficiarios/services/cobertura.service.ts',
+      `import { BodegasService, ParametrosLectura } from '../../plataforma/index.js';
+       export const usa = [BodegasService, ParametrosLectura];`,
+    );
+    const servicio = await fronterasDe(
+      'src/modules/inventario/services/salidas.service.ts',
+      `import { ParametrosService } from '../../plataforma/services/parametros.service.js';
+       export const usa = ParametrosService;`,
+    );
+    const repositorio = await fronterasDe(
+      'src/modules/beneficiarios/repositories/cobertura.prisma.repositorio.ts',
+      `import { BodegasPrismaRepositorio } from '../../plataforma/repositories/bodegas.prisma.repositorio.js';
+       export const usa = BodegasPrismaRepositorio;`,
+    );
+
+    expect(publico).toEqual([]);
+    expect(servicio).toHaveLength(1);
+    expect(servicio[0]).toContain('plataforma');
+    expect(repositorio).toHaveLength(1);
+    expect(repositorio[0]).toContain('plataforma');
+  });
+
   it('no estorba dentro del propio módulo', async () => {
     const errores = await fronterasDe(
       'src/modules/inventario/services/salidas.service.ts',

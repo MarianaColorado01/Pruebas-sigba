@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { BodegaLectura } from '@sigba/shared-types';
 import {
   AuditService,
   executeTransactionWithTenant,
@@ -68,6 +69,26 @@ export class BodegasPrismaRepositorio
         where: { id, bancoId, activa: true },
         select: { id: true, nombre: true },
       }),
+    );
+  }
+
+  async activas(): Promise<BodegaLectura[]> {
+    const bancoId = bancoDelContexto();
+
+    return executeTransactionWithTenant<BodegaLectura[]>(this.prisma, (tx) =>
+      tx.bodega.findMany({
+        where: { bancoId, activa: true },
+        orderBy: [{ nombre: 'asc' }, { id: 'asc' }],
+        select: COLUMNAS,
+      }),
+    );
+  }
+
+  async porId(id: string): Promise<BodegaLectura | null> {
+    const bancoId = bancoDelContexto();
+
+    return executeTransactionWithTenant<BodegaLectura | null>(this.prisma, (tx) =>
+      tx.bodega.findFirst({ where: { id, bancoId }, select: COLUMNAS }),
     );
   }
 

@@ -1,6 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ClaveParametro, ParametroVigente, ValorParametro } from '@sigba/shared-types';
-import { ParametrosService, ValorParametroInvalido } from './parametros.service.js';
+import type {
+  ClaveParametro,
+  ClaveParametroLectura,
+  ParametroVigente,
+  ValorParametro,
+} from '@sigba/shared-types';
+import { runWithTenantContext } from '../../../core/index.js';
+import {
+  fechaDeBogota,
+  ParametrosService,
+  ValorParametroAlmacenadoInvalido,
+  ValorParametroInvalido,
+  VigenciaDuplicada,
+} from './parametros.service.js';
 import { ConflictoDeVigencia, ParametrosRepositorio } from './parametros.repositorio.js';
 import { ParametroDesconocido } from './parametros.service.js';
 import type { ParametroVersion } from './parametros.repositorio.js';
@@ -21,6 +33,18 @@ class RepositorioEnMemoria extends ParametrosRepositorio {
           (fila.fechaFin === null || fecha <= fila.fechaFin),
       ) as ParametroVersion<K> | undefined) ?? null
     );
+  }
+
+  async vigentesEn<K extends ClaveParametro>(
+    clave: K,
+    fecha: string,
+  ): Promise<ParametroVersion<K>[]> {
+    return this.filas.filter(
+      (fila) =>
+        fila.clave === clave &&
+        fila.fechaInicio <= fecha &&
+        (fila.fechaFin === null || fecha <= fila.fechaFin),
+    ) as ParametroVersion<K>[];
   }
 
   async listarVigentes(fecha: string) {
@@ -282,5 +306,210 @@ describe('ParametrosService', () => {
     const resultado: ParametroVigente<'aporte_solidario_pct'> | null =
       await servicio.obtenerVigente('aporte_solidario_pct');
     expect(resultado).toBeNull();
+  });
+});
+
+describe('fechaDeBogota', () => {
+  it.each([
+    ['2026-10-01T03:00:00.000Z', '2026-09-30'],
+    ['2026-10-01T04:59:59.999Z', '2026-09-30'],
+    ['2026-10-01T05:00:00.000Z', '2026-10-01'],
+    ['2026-10-01T00:00:00.000Z', '2026-09-30'],
+    ['2026-12-31T23:59:59.000Z', '2026-12-31'],
+    ['2027-01-01T04:00:00.000Z', '2026-12-31'],
+  ])('%s es %s en Bogotá', (instante, esperada) => {
+    expect(fechaDeBogota(new Date(instante))).toBe(esperada);
+  });
+});
+
+describe('ParametrosService.consultarVigente', () => {
+  let repositorio: RepositorioEnMemoria;
+  let servicio: ParametrosService;
+
+  /** Mediodía en Bogotá: la fecha calendario no depende de la zona del servidor. */
+  const dia = (fecha: string) => new Date(`${fecha}T17:00:00.000Z`);
+
+  function fila<K extends ClaveParametro>(
+    datos: Omit<ParametroVersion<K>, 'version'> & { version?: number },
+  ): ParametroVersion<K> {
+    siguienteVersion += 1;
+    return { version: siguienteVersion, ...datos };
+  }
+  let siguienteVersion = 0;
+
+  /** Consulta como el banco A; RLS ya filtró las filas del repositorio en memoria. */
+  const consultar = <K extends ClaveParametroLectura>(clave: K, fecha: Date) =>
+    runWithTenantContext({ bancoId: 'banco-a' }, () => servicio.consultarVigente(clave, fecha));
+
+  beforeEach(() => {
+    siguienteVersion = 0;
+    repositorio = new RepositorioEnMemoria();
+    servicio = new ParametrosService(repositorio);
+    repositorio.filas.push(
+      fila({
+        id: 'aporte-v1',
+        clave: 'aporte_solidario_pct',
+        valor: 8,
+        fechaInicio: '2026-09-01',
+        fechaFin: '2026-09-30',
+      }),
+      fila({
+        id: 'aporte-v2',
+        clave: 'aporte_solidario_pct',
+        valor: 10,
+        fechaInicio: '2026-10-01',
+        fechaFin: null,
+      }),
+    );
+  });
+
+  it.each([
+    ['2026-09-20', 'aporte-v1', 8],
+    ['2026-09-30', 'aporte-v1', 8],
+    ['2026-10-01', 'aporte-v2', 10],
+    ['2026-11-15', 'aporte-v2', 10],
+  ])('el %s devuelve %s', async (fecha, parametroId, valor) => {
+    await expect(consultar('aporte_solidario_pct', dia(fecha))).resolves.toEqual({
+      encontrado: true,
+      clave: 'aporte_solidario_pct',
+      valor,
+      parametroId,
+      version: parametroId === 'aporte-v1' ? 1 : 2,
+      fechaInicio: parametroId === 'aporte-v1' ? '2026-09-01' : '2026-10-01',
+      fechaFin: parametroId === 'aporte-v1' ? '2026-09-30' : null,
+    });
+  });
+
+  it('cuenta el día en Bogotá: las 22:00 del 30 de septiembre allá aún usan la versión vieja', async () => {
+    await expect(
+      consultar('aporte_solidario_pct', new Date('2026-10-01T03:00:00.000Z')),
+    ).resolves.toMatchObject({ encontrado: true, parametroId: 'aporte-v1', valor: 8 });
+  });
+
+  it('antes de la primera vigencia no hay valor, y no es 0', async () => {
+    await expect(consultar('aporte_solidario_pct', dia('2026-08-31'))).resolves.toEqual({
+      encontrado: false,
+      clave: 'aporte_solidario_pct',
+      motivo: 'SIN_VALOR_VIGENTE',
+      fecha: '2026-08-31',
+    });
+  });
+
+  it('una clave sin registros responde encontrado: false', async () => {
+    await expect(consultar('retencion_dias', dia('2026-10-15'))).resolves.toEqual({
+      encontrado: false,
+      clave: 'retencion_dias',
+      motivo: 'SIN_VALOR_VIGENTE',
+      fecha: '2026-10-15',
+    });
+  });
+
+  it('devuelve el valor tipado de cada clave', async () => {
+    const rangos = [
+      { desde: 0, hasta: 5 },
+      { desde: 6, hasta: null },
+    ];
+    repositorio.filas.push(
+      fila({
+        id: 'rangos-v1',
+        clave: 'rangos_etarios',
+        valor: rangos,
+        fechaInicio: '2026-01-01',
+        fechaFin: null,
+      }),
+    );
+
+    const resultado = await consultar('rangos_etarios', dia('2026-10-15'));
+    if (!resultado.encontrado) throw new Error('Debía encontrar los rangos');
+    expect(resultado.valor).toEqual(rangos);
+  });
+
+  it.each([
+    ['aporte_solidario_pct', '8'],
+    ['aporte_solidario_pct', 15],
+    ['semaforo_rojo_dias', 0],
+    ['rangos_etarios', { desde: 0, hasta: null }],
+    ['recordatorio_borrador_horas', null],
+    ['retencion_dias', 1.5],
+  ] as const)(
+    'un %s guardado como %j lanza ValorParametroAlmacenadoInvalido',
+    async (clave, valor) => {
+      repositorio.filas.splice(0, repositorio.filas.length);
+      repositorio.filas.push(
+        fila({
+          id: 'corrupto',
+          clave,
+          valor: valor as never,
+          fechaInicio: '2026-10-10',
+          fechaFin: null,
+        }),
+      );
+
+      const error = await consultar(clave, dia('2026-10-15')).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ValorParametroAlmacenadoInvalido);
+      expect(error).toMatchObject({ clave, parametroId: 'corrupto' });
+    },
+  );
+
+  it('dos versiones vigentes el mismo día lanzan VigenciaDuplicada', async () => {
+    repositorio.filas.push(
+      fila({
+        id: 'aporte-solapada',
+        clave: 'aporte_solidario_pct',
+        valor: 9,
+        fechaInicio: '2026-10-10',
+        fechaFin: null,
+      }),
+    );
+
+    const error = await consultar('aporte_solidario_pct', dia('2026-10-15')).catch(
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(VigenciaDuplicada);
+    expect(error).toMatchObject({ clave: 'aporte_solidario_pct', fecha: '2026-10-15' });
+  });
+
+  it('sin banco en el contexto falla antes de consultar, en vez de responder sin valor', async () => {
+    const vigentesEn = vi.spyOn(repositorio, 'vigentesEn');
+
+    await expect(
+      servicio.consultarVigente('aporte_solidario_pct', dia('2026-10-15')),
+    ).rejects.toThrow('sin banco en el contexto de tenant');
+    await expect(
+      runWithTenantContext({ actor: 'sin-banco' }, () =>
+        servicio.consultarVigente('aporte_solidario_pct', dia('2026-10-15')),
+      ),
+    ).rejects.toThrow('sin banco en el contexto de tenant');
+    expect(vigentesEn).not.toHaveBeenCalled();
+  });
+
+  it('obtenerVigente, el anterior, sigue respondiendo sin contexto', async () => {
+    await expect(
+      servicio.obtenerVigente('aporte_solidario_pct', '2026-10-15'),
+    ).resolves.toMatchObject({
+      valor: 10,
+    });
+  });
+
+  it('rechaza una fecha inválida', async () => {
+    await expect(consultar('aporte_solidario_pct', new Date('no es fecha'))).rejects.toThrow(
+      'La fecha no es válida.',
+    );
+  });
+
+  it('obtenerVigente conserva su forma y su null con los mismos datos', async () => {
+    await expect(servicio.obtenerVigente('aporte_solidario_pct', '2026-09-30')).resolves.toEqual({
+      valor: 8,
+      version: 1,
+      fecha_inicio: '2026-09-01',
+      fecha_fin: '2026-09-30',
+    });
+    await expect(servicio.obtenerVigente('aporte_solidario_pct', '2026-10-01')).resolves.toEqual({
+      valor: 10,
+      version: 2,
+      fecha_inicio: '2026-10-01',
+      fecha_fin: null,
+    });
+    await expect(servicio.obtenerVigente('aporte_solidario_pct', '2026-08-31')).resolves.toBeNull();
   });
 });

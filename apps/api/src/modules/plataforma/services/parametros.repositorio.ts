@@ -22,6 +22,12 @@ export abstract class ParametrosRepositorio {
     fecha: string,
   ): Promise<ParametroVersion<K> | null>;
 
+  /** Todas las versiones de `clave` vigentes en `fecha`; más de una son datos corruptos. */
+  abstract vigentesEn<K extends ClaveParametro>(
+    clave: K,
+    fecha: string,
+  ): Promise<ParametroVersion<K>[]>;
+
   abstract listarVigentes(fecha: string): Promise<ParametroVersion[]>;
 
   abstract historial(clave: ClaveParametro): Promise<ParametroVersion[]>;

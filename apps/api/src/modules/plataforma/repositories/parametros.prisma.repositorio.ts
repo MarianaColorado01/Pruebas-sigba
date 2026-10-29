@@ -74,6 +74,25 @@ export class ParametrosPrismaRepositorio extends ParametrosRepositorio {
     return fila ? desdePrisma<K>(fila) : null;
   }
 
+  async vigentesEn<K extends ClaveParametro>(
+    clave: K,
+    fecha: string,
+  ): Promise<ParametroVersion<K>[]> {
+    const filas = await executeTransactionWithTenant<Prisma.ParametroBancoGetPayload<object>[]>(
+      this.prisma,
+      (tx) =>
+        tx.parametroBanco.findMany({
+          where: {
+            clave,
+            fechaInicio: { lte: fechaDb(fecha) },
+            OR: [{ fechaFin: null }, { fechaFin: { gte: fechaDb(fecha) } }],
+          },
+          orderBy: { version: 'asc' },
+        }),
+    );
+    return filas.map((fila) => desdePrisma<K>(fila));
+  }
+
   async listarVigentes(fecha: string): Promise<ParametroVersion[]> {
     const filas = await executeTransactionWithTenant<Prisma.ParametroBancoGetPayload<object>[]>(
       this.prisma,

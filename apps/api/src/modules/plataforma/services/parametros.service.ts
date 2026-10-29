@@ -1,23 +1,71 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   type ClaveParametro,
+  type ClaveParametroLectura,
   type ParametroHistorial,
   type ParametroListado,
   type ParametroVigente,
   type RangoEtario,
+  type ResultadoParametro,
   type ValorParametro,
 } from '@sigba/shared-types';
+import { getTenantContext } from '../../../core/index.js';
 import { ParametrosRepositorio } from './parametros.repositorio.js';
 
 type Validador = (valor: unknown) => boolean;
 
 export abstract class ParametrosLectura {
+  /**
+   * @deprecated Usa `consultarVigente`, que devuelve el `parametroId` que el
+   * movimiento debe guardar y valida el valor leído (SBA-34).
+   */
   abstract obtenerVigente<K extends ClaveParametro>(
     clave: K,
     fecha?: string,
   ): Promise<ParametroVigente<K> | null>;
 
   abstract listarVigentes(fecha?: string): Promise<ParametroListado[]>;
+
+  /**
+   * Versión vigente de `clave` en el día de Bogotá que contiene `fecha`.
+   * Contrato en docs/arquitectura/contratos/plataforma-lectura.md.
+   *
+   * No es abstracto porque los dobles de prueba de inventario heredan de esta
+   * clase y no lo implementan; `ParametrosService` lo sobrescribe.
+   *
+   * @throws ValorParametroAlmacenadoInvalido
+   * @throws VigenciaDuplicada
+   */
+  consultarVigente<K extends ClaveParametroLectura>(
+    _clave: K,
+    _fecha: Date,
+  ): Promise<ResultadoParametro<K>> {
+    return Promise.reject(new Error('consultarVigente no está implementado.'));
+  }
+}
+
+/** La versión vigente tiene un valor que no cumple la forma de su clave. */
+export class ValorParametroAlmacenadoInvalido extends Error {
+  constructor(
+    readonly clave: ClaveParametro,
+    readonly parametroId: string,
+  ) {
+    super(`El valor guardado de ${clave} (${parametroId}) no tiene la forma esperada.`);
+  }
+}
+
+/**
+ * Hay más de una versión vigente de la clave en el mismo día. La restricción
+ * `parametro_banco_sin_solapamiento` lo impide; si pasa, no se elige una.
+ */
+export class VigenciaDuplicada extends Error {
+  constructor(
+    readonly clave: ClaveParametro,
+    readonly fecha: string,
+    readonly parametroIds: string[],
+  ) {
+    super(`Hay ${parametroIds.length} versiones vigentes de ${clave} el ${fecha}.`);
+  }
 }
 
 export class ParametroDesconocido extends BadRequestException {
@@ -86,7 +134,8 @@ const FORMATEADOR_BOGOTA = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 });
 
-function fechaDeBogota(ahora = new Date()): string {
+/** Día calendario (YYYY-MM-DD) de `ahora` en Bogotá, que es UTC−5 todo el año. */
+export function fechaDeBogota(ahora = new Date()): string {
   const partes = Object.fromEntries(
     FORMATEADOR_BOGOTA.formatToParts(ahora).map(({ type, value }) => [type, value]),
   );
@@ -135,6 +184,43 @@ export class ParametrosService extends ParametrosLectura {
           fecha_fin: fila.fechaFin,
         }
       : null;
+  }
+
+  override async consultarVigente<K extends ClaveParametroLectura>(
+    clave: K,
+    fecha: Date,
+  ): Promise<ResultadoParametro<K>> {
+    validarClave(clave);
+    // Sin banco, RLS devolvería cero filas y se confundiría con «sin valor vigente».
+    if (!getTenantContext()?.bancoId) {
+      throw new Error('Consulta de parámetros sin banco en el contexto de tenant.');
+    }
+    if (Number.isNaN(fecha.valueOf())) throw new BadRequestException('La fecha no es válida.');
+    const dia = fechaDeBogota(fecha);
+
+    const filas = await this.repositorio.vigentesEn(clave, dia);
+    const [fila] = filas;
+    if (!fila) return { encontrado: false, clave, motivo: 'SIN_VALOR_VIGENTE', fecha: dia };
+    if (filas.length > 1) {
+      throw new VigenciaDuplicada(
+        clave,
+        dia,
+        filas.map(({ id }) => id),
+      );
+    }
+    if (!CATALOGO_PARAMETROS[clave](fila.valor)) {
+      throw new ValorParametroAlmacenadoInvalido(clave, fila.id);
+    }
+
+    return {
+      encontrado: true,
+      clave,
+      valor: fila.valor,
+      parametroId: fila.id,
+      version: fila.version,
+      fechaInicio: fila.fechaInicio,
+      fechaFin: fila.fechaFin,
+    };
   }
 
   async listarVigentes(fecha?: string): Promise<ParametroListado[]> {
